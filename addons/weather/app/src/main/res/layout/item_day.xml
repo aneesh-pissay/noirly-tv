@@ -11,11 +11,11 @@
         android:id="@+id/dayName"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:fontFamily="sans-serif-medium"
-        android:letterSpacing="0.12"
+        android:fontFamily="@font/noirly_mono_medium"
+        android:letterSpacing="0.16"
         android:textAllCaps="true"
-        android:textColor="#B3FFFFFF"
-        android:textSize="14sp" />
+        android:textColor="#7DF5F3EA"
+        android:textSize="12sp" />
 
     <TextView
         android:id="@+id/daySky"
@@ -23,8 +23,9 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
         android:ellipsize="end"
+        android:fontFamily="@font/noirly_hanken_regular"
         android:singleLine="true"
-        android:textColor="#FFFFFFFF"
+        android:textColor="#ADF5F3EA"
         android:textSize="18sp" />
 
     <TextView
@@ -32,7 +33,8 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
-        android:fontFamily="sans-serif-light"
-        android:textColor="#FFFFFFFF"
+        android:fontFamily="@font/noirly_fraunces_bold"
+        android:letterSpacing="-0.02"
+        android:textColor="#FFF5F3EA"
         android:textSize="26sp" />
 </LinearLayout>

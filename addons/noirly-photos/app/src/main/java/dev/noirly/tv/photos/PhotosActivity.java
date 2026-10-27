@@ -48,6 +48,8 @@ public final class PhotosActivity extends Activity {
     private Library library;
     private TextView title, words;
     private LinearLayout buttons;
+    /** The slideshow options (speed, shuffle), a quieter row under the buttons while photos are kept. */
+    private LinearLayout extras;
     private FrameLayout side;
     private PhoneSignIn signIn;
     /** The pick in progress; set to null (or replaced) to stop its worker. */
@@ -85,6 +87,12 @@ public final class PhotosActivity extends Activity {
         LinearLayout.LayoutParams blp = wrap();
         blp.topMargin = n.px(28);
         column.addView(buttons, blp);
+        extras = new LinearLayout(this);
+        extras.setOrientation(LinearLayout.HORIZONTAL);
+        extras.setClipChildren(false);
+        LinearLayout.LayoutParams xlp = wrap();
+        xlp.topMargin = n.px(14);
+        column.addView(extras, xlp);
         FrameLayout.LayoutParams clp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.START | Gravity.CENTER_VERTICAL);
         clp.leftMargin = n.px(56);
@@ -118,6 +126,7 @@ public final class PhotosActivity extends Activity {
         List<File> photos = library.photos();
         side.removeAllViews();
         buttons.removeAllViews();
+        extras.removeAllViews();
         if (photos.isEmpty()) {
             title.setText("Your Google Photos,\non the TV");
             words.setText("Choose albums or photos on your phone and they are kept on the TV for a slideshow "
@@ -129,6 +138,19 @@ public final class PhotosActivity extends Activity {
                     + "they also play as the screensaver (Noirly Photos in the TV's screensaver settings).");
             addButton("Slideshow", true, () -> startActivity(new Intent(this, SlideshowActivity.class)))
                     .requestFocus();
+            android.content.SharedPreferences o = Options.prefs(this);
+            int secs = Options.seconds(o);
+            addTo(extras, "Every " + Options.speedWords(secs), () -> {
+                o.edit().putInt("seconds", Options.nextSpeed(secs)).apply();
+                showLibrary();
+                extras.getChildAt(0).requestFocus();
+            });
+            boolean shuffle = Options.shuffle(o);
+            addTo(extras, shuffle ? "Shuffle on" : "Shuffle off", () -> {
+                o.edit().putBoolean("shuffle", !shuffle).apply();
+                showLibrary();
+                extras.getChildAt(1).requestFocus();
+            });
             addButton("Choose again", false, this::choose);
             addButton("Remove", false, () -> {
                 library.clearAll();
@@ -249,6 +271,7 @@ public final class PhotosActivity extends Activity {
         title.setText(head);
         words.setText(body);
         buttons.removeAllViews();
+        extras.removeAllViews();
         addButton("Cancel", false, this::cancel).requestFocus();
 
         side.removeAllViews();
@@ -282,6 +305,8 @@ public final class PhotosActivity extends Activity {
         words.setText(body);
         if (buttons.getChildCount() == 0 || worker == null) {
             buttons.removeAllViews();
+            extras.removeAllViews();
+        extras.removeAllViews();
             addButton("Cancel", false, this::cancel).requestFocus();
         }
         side.removeAllViews();
@@ -293,6 +318,7 @@ public final class PhotosActivity extends Activity {
         title.setText(head);
         words.setText(body);
         buttons.removeAllViews();
+        extras.removeAllViews();
         side.removeAllViews();
         addButton("Choose photos", true, this::choose).requestFocus();
         if (!library.photos().isEmpty()) addButton("Back", false, this::showLibrary);
@@ -304,6 +330,15 @@ public final class PhotosActivity extends Activity {
     }
 
     // ---- small builders ----
+
+    private void addTo(LinearLayout row, String words, Runnable action) {
+        TextView b = n.button(words, false, action);
+        b.setTextSize(10);
+        b.setPadding(n.px(16), n.px(8), n.px(16), n.px(8));
+        LinearLayout.LayoutParams lp = wrap();
+        if (row.getChildCount() > 0) lp.leftMargin = n.px(10);
+        row.addView(b, lp);
+    }
 
     private View addButton(String words, boolean primary, Runnable action) {
         TextView b = n.button(words, primary, action);

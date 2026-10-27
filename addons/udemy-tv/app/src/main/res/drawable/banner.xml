@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The TV banner: a play mark in a mortarboard-like chevron on Noirly near-black, drawn for this add-on. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp" android:height="180dp"
+    android:viewportWidth="320" android:viewportHeight="180">
+    <path android:fillColor="#FF0A0A08" android:pathData="M0,0h320v180h-320z" />
+    <path android:fillColor="#FFA435F0" android:pathData="M160,38l52,24 -52,24 -52,-24z" />
+    <path android:fillColor="#FFF5F3EA" android:pathData="M132,82v30c0,14 56,14 56,0v-30l-28,13z" />
+    <path android:fillColor="#FF0A0A08" android:pathData="M153,98v18l15,-9z" />
+</vector>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Weather icon for the Studio Home bar (StudioHome.weatherIcon). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:strokeColor="#FFC9D2DE" android:strokeWidth="2" android:strokeLineCap="round"
+        android:pathData="M3,7h18M5,12h14M3,17h18" />
+</vector>

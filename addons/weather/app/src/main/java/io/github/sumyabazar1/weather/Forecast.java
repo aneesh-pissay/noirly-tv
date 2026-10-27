@@ -261,8 +261,24 @@ final class Forecast {
         return aqiBand(aqi) == 1 ? 0xFF1A1A1A : 0xFFFFFFFF;
     }
 
-    /** A full-screen gradient in the weather's colours, dark at the bottom. */
+    /**
+     * Noirly's page (Warm Gold, dark): near-black, lit from the top by a soft glow in the weather's colour, so the page
+     * still tells sun from snow at a glance, fading to black at the bottom.
+     */
     static Drawable backdrop(int code, boolean day) {
+        int tint = weatherColour(code, day);
+        GradientDrawable glow = new GradientDrawable();
+        glow.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+        glow.setGradientCenter(0.3f, 0f);
+        glow.setGradientRadius(1400);
+        glow.setColors(new int[]{(tint & 0x00FFFFFF) | 0x59000000, tint & 0x00FFFFFF});
+        GradientDrawable page = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0xFF141412, 0xFF0A0A08, 0xFF000000});
+        return new android.graphics.drawable.LayerDrawable(new Drawable[]{page, glow});
+    }
+
+    /** The weather's own colour: the top of the gradient this page used before it took on the Noirly look. */
+    private static int weatherColour(int code, boolean day) {
         int[] colours;
         if (code <= 1) {
             colours = day ? new int[]{0xFF2A6AA8, 0xFF0A1626} : new int[]{0xFF0D1B3E, 0xFF020308};
@@ -277,6 +293,6 @@ final class Forecast {
         } else {
             colours = new int[]{0xFF3B4654, 0xFF0C0F14};
         }
-        return new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, colours);
+        return colours[0];
     }
 }

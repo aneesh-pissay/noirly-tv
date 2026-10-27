@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Full screen on a 1080p TV (960 x 540 dp). The background gradient follows the weather (Forecast.backdrop). -->
+<!-- Full screen on a 1080p TV (960 x 540 dp). Noirly Warm Gold, dark: a near-black page with a faint glow in the
+     weather's colour (Forecast.backdrop); Fraunces for figures, Hanken Grotesk for copy, JetBrains Mono for labels. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FF0C0F14">
+    android:background="#FF0A0A08">
 
     <LinearLayout
         android:id="@+id/content"
@@ -20,12 +21,12 @@
             android:id="@+id/place"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:fontFamily="sans-serif-medium"
-            android:letterSpacing="0.14"
+            android:fontFamily="@font/noirly_mono_medium"
+            android:letterSpacing="0.22"
             android:singleLine="true"
             android:textAllCaps="true"
-            android:textColor="#B3FFFFFF"
-            android:textSize="15sp" />
+            android:textColor="#7DF5F3EA"
+            android:textSize="13sp" />
 
         <LinearLayout
             android:layout_width="wrap_content"
@@ -37,10 +38,10 @@
                 android:id="@+id/temp"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:fontFamily="sans-serif-light"
+                android:fontFamily="@font/noirly_fraunces_bold"
                 android:includeFontPadding="false"
-                android:letterSpacing="-0.06"
-                android:textColor="#FFFFFFFF"
+                android:letterSpacing="-0.04"
+                android:textColor="#FFF5F3EA"
                 android:textSize="104sp" />
 
             <LinearLayout
@@ -53,7 +54,9 @@
                     android:id="@+id/sky"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="#FFFFFFFF"
+                    android:fontFamily="@font/noirly_fraunces_bold"
+                    android:letterSpacing="-0.02"
+                    android:textColor="#FFF5F3EA"
                     android:textSize="30sp" />
 
                 <TextView
@@ -61,7 +64,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:textColor="#B3FFFFFF"
+                    android:fontFamily="@font/noirly_hanken_regular"
+                    android:textColor="#ADF5F3EA"
                     android:textSize="18sp" />
             </LinearLayout>
         </LinearLayout>
@@ -71,7 +75,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:fontFamily="sans-serif-medium"
+            android:fontFamily="@font/noirly_mono_medium"
+            android:letterSpacing="0.06"
             android:paddingStart="14dp"
             android:paddingTop="6dp"
             android:paddingEnd="14dp"
@@ -94,8 +99,9 @@
         android:layout_gravity="center"
         android:gravity="center"
         android:maxWidth="560dp"
+        android:fontFamily="@font/noirly_hanken_regular"
         android:text="@string/loading"
-        android:textColor="#CCFFFFFF"
+        android:textColor="#ADF5F3EA"
         android:textSize="20sp" />
 
     <LinearLayout
@@ -114,21 +120,25 @@
             android:layout_height="wrap_content"
             android:background="@drawable/pill"
             android:focusable="true"
-            android:fontFamily="sans-serif-medium"
-            android:paddingStart="20dp"
-            android:paddingTop="10dp"
-            android:paddingEnd="20dp"
-            android:paddingBottom="10dp"
+            android:fontFamily="@font/noirly_mono_medium"
+            android:letterSpacing="0.14"
+            android:paddingStart="22dp"
+            android:paddingTop="12dp"
+            android:paddingEnd="22dp"
+            android:paddingBottom="12dp"
             android:text="@string/change_city"
+            android:textAllCaps="true"
             android:textColor="@color/pill_text"
-            android:textSize="16sp" />
+            android:textSize="12sp" />
 
         <TextView
             android:id="@+id/updated"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="20dp"
-            android:textColor="#80FFFFFF"
-            android:textSize="14sp" />
+            android:fontFamily="@font/noirly_mono_medium"
+            android:letterSpacing="0.08"
+            android:textColor="#7DF5F3EA"
+            android:textSize="11sp" />
     </LinearLayout>
 </FrameLayout>

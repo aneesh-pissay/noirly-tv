@@ -29,6 +29,11 @@ import android.media.tv.TvContract;
 import android.media.tv.TvInputInfo;
 import android.media.tv.TvInputManager;
 import android.net.Uri;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
@@ -83,6 +88,8 @@ final class StudioHome {
 
     /** Where the Theme button keeps its choice: "palette" (an id from NoirlyPalette) and "dark". */
     private static final String THEME_PREFS = "studio_theme";
+    /** The owner's app for each big card ("slot0".."slot2"), chosen by holding OK on it; over the theme's dock_apps. */
+    private static final String HERO_PREFS = "studio_heroes";
     /** Noirly's letter spacing: display type tight, mono labels wide (em). */
     private static final float DISPLAY_TRACKING = -0.02f, LABEL_TRACKING = 0.14f;
     /** The first tab under "Your apps", and the category the Settings card is filed under. */
@@ -123,6 +130,7 @@ final class StudioHome {
         tag("com.android.vending", "Get more apps.", "System");
         tag("io.github.sumyabazar1.weather", "The forecast for your city.", "Utilities");
         tag("dev.noirly.tv.photos", "Your Google Photos.", "Photos & Videos");
+        tag("dev.noirly.tv.udemy", "Courses with your remote.", "Education");
     }
 
     private static void tag(String pkg, String tagline, String category) {
@@ -164,6 +172,13 @@ final class StudioHome {
     private String tab = ALL;
     /** Every app the grid can show, in grid order; fillGrid() picks the chosen tab's from it. */
     private List<App> gridApps = new ArrayList<>();
+    /** Every launchable app, and the package on each big card, from the last rebuild. */
+    private Map<String, App> allApps = new HashMap<>();
+    private List<String> heroPkgs = new ArrayList<>();
+    /** The Wi-Fi button's icon and its colour at rest (showNet). */
+    private Drawable lastIcon, wifiIcon;
+    private TextView lastLabel, wifiLabel;
+    private int wifiColor;
     private final ScrollView gridScroll;
     private final LinearLayout grid;
     private final HorizontalScrollView dockScroll;
@@ -235,6 +250,9 @@ final class StudioHome {
         buttons.addView(roundButton(R.drawable.ic_input, "Inputs", this::showInputs));
         buttons.addView(roundButton(R.drawable.ic_wifi, "Wi-Fi",
                 () -> open(SystemSettings.intent(a, Settings.ACTION_WIFI_SETTINGS))));
+        wifiIcon = lastIcon;
+        wifiLabel = lastLabel;
+        wifiColor = p.text;
         View[] theme = new View[1];
         theme[0] = roundButton(R.drawable.ic_palette, "Theme", () -> showThemes(theme[0]));
         buttons.addView(theme[0]);
@@ -396,9 +414,18 @@ final class StudioHome {
         } catch (SecurityException ignored) {
         }
         askWeather();
+        try {
+            a.getSystemService(ConnectivityManager.class).registerDefaultNetworkCallback(net, main);
+        } catch (RuntimeException ignored) {
+        }
+        showNet();
     }
 
     void onPause() {
+        try {
+            a.getSystemService(ConnectivityManager.class).unregisterNetworkCallback(net);
+        } catch (RuntimeException ignored) {
+        }
         main.removeCallbacks(weatherTick);
         a.getContentResolver().unregisterContentObserver(weatherChanged);
     }
@@ -436,11 +463,10 @@ final class StudioHome {
 
         heroRow.removeAllViews();
         heroes.clear();
-        List<String> heroKeys = strings("dock_apps");
-        for (String key : heroKeys) {
-            App app = apps.get(key);
-            if (app == null || heroes.size() == HEROES) continue;
-            View card = heroCard(app);
+        allApps = apps;
+        heroPkgs = heroPicks(apps, ordered);
+        for (int slot = 0; slot < heroPkgs.size(); slot++) {
+            View card = heroCard(apps.get(heroPkgs.get(slot)), slot);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1);
             if (!heroes.isEmpty()) lp.leftMargin = px(14);
             heroRow.addView(card, lp);
@@ -601,7 +627,105 @@ final class StudioHome {
         return out;
     }
 
-    private View heroCard(App app) {
+    /**
+     * The three big cards: the theme's dock_apps (topped up from Your apps when fewer are installed), then the owner's
+     * own choice for each slot, made by holding OK on a card (HERO_PREFS).
+     */
+    private List<String> heroPicks(Map<String, App> apps, List<App> ordered) {
+        List<String> out = new ArrayList<>();
+        for (String key : strings("dock_apps")) if (apps.containsKey(key) && !out.contains(key)) out.add(key);
+        for (App app : ordered) if (out.size() < HEROES && !out.contains(app.key)) out.add(app.key);
+        while (out.size() > HEROES) out.remove(out.size() - 1);
+        SharedPreferences chosen = a.getSharedPreferences(HERO_PREFS, Context.MODE_PRIVATE);
+        for (int slot = 0; slot < out.size(); slot++) {
+            String pick = chosen.getString("slot" + slot, "");
+            if (!apps.containsKey(pick)) continue;
+            int was = out.indexOf(pick);
+            if (was >= 0) out.set(was, out.get(slot));   // already on another card: they trade places
+            out.set(slot, pick);
+        }
+        return out;
+    }
+
+    /** Hold OK on a big card: every app, the one there now marked; OK puts it on this card. */
+    private void showHeroPicker(int slot, View anchor) {
+        LinearLayout rows = new LinearLayout(a);
+        rows.setOrientation(LinearLayout.VERTICAL);
+        rows.setPadding(px(8), px(10), px(8), px(8));
+        ScrollView scroll = new ScrollView(a);
+        scroll.setVerticalScrollBarEnabled(false);
+        scroll.setBackground(rounded(p.surface, 14, p.hairlineStrong));
+        scroll.addView(rows);
+        PopupWindow popup = new PopupWindow(scroll, px(260), Math.min(px(360),
+                a.getResources().getDisplayMetrics().heightPixels - px(80)), true);
+        popup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
+
+        rows.addView(popupHeading("Big card " + (slot + 1)));
+        View current = null;
+        rows.addView(pickRow("Default", null, false, () -> { popup.dismiss(); chooseHero(slot, null); }));
+        List<App> sorted = new ArrayList<>(allApps.values());
+        Collator c = Collator.getInstance();
+        sorted.sort((x, y) -> c.compare(x.label, y.label));
+        for (App app : sorted) {
+            boolean on = app.key.equals(heroPkgs.get(slot));
+            View row = pickRow(app.label, circle(icon(app)), on, () -> { popup.dismiss(); chooseHero(slot, app.key); });
+            rows.addView(row);
+            if (on) current = row;
+        }
+        popup.showAsDropDown(anchor, (anchor.getWidth() - px(260)) / 2, -anchor.getHeight() / 2);
+        View focus = current != null ? current : rows.getChildAt(1);
+        focus.requestFocus();
+    }
+
+    private View pickRow(String label, Bitmap icon, boolean on, Runnable action) {
+        LinearLayout row = new LinearLayout(a);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(px(10), px(6), px(10), px(6));
+        if (icon != null) {
+            ImageView image = new ImageView(a);
+            image.setImageBitmap(icon);
+            LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(px(24), px(24));
+            ilp.rightMargin = px(10);
+            row.addView(image, ilp);
+        }
+        TextView name = displayText(15);
+        name.setText(label);
+        name.setSingleLine(true);
+        name.setEllipsize(TextUtils.TruncateAt.END);
+        row.addView(name, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        TextView mark = label(9, p.accent);
+        mark.setText(on ? "On" : "");
+        row.addView(mark);
+        Drawable lit = rounded(p.accentSoft, 9, p.accent);
+        row.setFocusable(true);
+        row.setOnFocusChangeListener((v, f) -> {
+            v.setBackground(f ? lit : null);
+            name.setTextColor(f ? p.accent : p.text);
+        });
+        row.setOnClickListener(v -> action.run());
+        return row;
+    }
+
+    /** Keeps the choice for this card (null: back to the theme's) and redraws Home with focus on it. */
+    private void chooseHero(int slot, String pkg) {
+        SharedPreferences.Editor e = a.getSharedPreferences(HERO_PREFS, Context.MODE_PRIVATE).edit();
+        if (pkg == null) {
+            e.remove("slot" + slot);
+        } else {
+            // The app may sit on another card by its own choice: that card takes this card's old app.
+            for (int other = 0; other < heroPkgs.size(); other++) {
+                if (other != slot && pkg.equals(heroPkgs.get(other))) e.putString("slot" + other, heroPkgs.get(slot));
+            }
+            e.putString("slot" + slot, pkg);
+        }
+        e.apply();
+        rebuild();
+        lastHero = slot;
+        go(heroes, slot);
+    }
+
+    private View heroCard(App app, int slot) {
         Drawable banner = banner(app.info);
         Bitmap art = banner != null ? toBitmap(banner, 320, 180) : null;
         int color = art != null ? dominant(art) : dominant(icon(app));
@@ -662,6 +786,10 @@ final class StudioHome {
         card.addView(ring, match());
         focusable(card, 1.04f, hasFocus -> ring.setVisibility(hasFocus ? View.VISIBLE : View.INVISIBLE));
         card.setOnClickListener(v -> launch(app));
+        card.setOnLongClickListener(v -> {
+            showHeroPicker(slot, v);
+            return true;
+        });
         return card;
     }
 
@@ -703,7 +831,7 @@ final class StudioHome {
         name.setText(title);
         name.setSingleLine(true);
         name.setEllipsize(TextUtils.TruncateAt.END);
-        TextView kind = label(10, p.muted);
+        TextView kind = text(13, p.text2, body);   // Hanken, as the subtitle under the greeting
         kind.setText(subtitle);
         kind.setSingleLine(true);
         words.addView(name);
@@ -764,15 +892,53 @@ final class StudioHome {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(px(62), ViewGroup.LayoutParams.WRAP_CONTENT);
         box.setLayoutParams(lp);
         final Drawable icn = d;
+        lastIcon = d;
+        lastLabel = name;
         focusable(box, 1.08f, hasFocus -> {
             circle.setBackground(hasFocus ? lit : normal);
-            if (icn != null) icn.setTint(hasFocus ? p.accentInk : p.text);
+            if (icn != null) icn.setTint(hasFocus ? p.accentInk : icn == wifiIcon ? wifiColor : p.text);
             name.setTextColor(hasFocus ? p.accent : p.text2);
         });
         box.setOnClickListener(v -> action.run());
         top.add(box);
         return box;
     }
+
+    /** The Wi-Fi icon's colour at rest: green online, orange connected without internet, red offline. */
+    private void showNet() {
+        ConnectivityManager cm = a.getSystemService(ConnectivityManager.class);
+        NetworkCapabilities nc = cm.getNetworkCapabilities(cm.getActiveNetwork());
+        wifiColor = nc == null ? 0xFFEF4444
+                : nc.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) ? 0xFF22C55E : 0xFFF59E0B;
+        View b = top.size() > 1 ? top.get(1) : null;
+        if (wifiIcon != null && b != null && !b.hasFocus()) wifiIcon.setTint(wifiColor);
+        // wifi_label_width (dp): the network name under the button instead of "Wi-Fi", cut with an ellipsis.
+        int w = cfg.optInt("wifi_label_width", a.getResources().getInteger(R.integer.wifi_label_width));
+        if (w <= 0 || wifiLabel == null || b == null) return;
+        String ssid = null;
+        if (nc != null && nc.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+            WifiInfo info = a.getSystemService(WifiManager.class).getConnectionInfo();
+            ssid = info != null ? info.getSSID().replace("\"", "").trim() : null;
+            if (ssid != null && (ssid.isEmpty() || ssid.contains("unknown"))) ssid = null;
+        }
+        wifiLabel.setText(ssid != null ? ssid : nc == null ? "Offline" : "Wi-Fi");
+        wifiLabel.setSingleLine(true);
+        wifiLabel.setAllCaps(true);   // setSingleLine drops the caps transform the other labels keep
+        wifiLabel.setEllipsize(TextUtils.TruncateAt.END);
+        wifiLabel.setMaxWidth(px(w));
+        b.getLayoutParams().width = ViewGroup.LayoutParams.WRAP_CONTENT;
+        b.setMinimumWidth(px(62));
+        b.requestLayout();
+    }
+
+    /** Android tells Home when the network comes, goes or passes its internet check. */
+    private final ConnectivityManager.NetworkCallback net = new ConnectivityManager.NetworkCallback() {
+        @Override
+        public void onCapabilitiesChanged(Network n, NetworkCapabilities c) { showNet(); }
+
+        @Override
+        public void onLost(Network n) { main.post(StudioHome.this::showNet); }
+    };
 
     private interface FocusChange { void on(boolean hasFocus); }
 
@@ -791,6 +957,7 @@ final class StudioHome {
     /** D-pad moves between the header buttons, the hero cards, the app cards and the bar, one step at a time. */
     boolean dispatchKey(KeyEvent event) {
         int code = event.getKeyCode();
+        if (settingsKey(event)) return true;
         if (code != KeyEvent.KEYCODE_DPAD_UP && code != KeyEvent.KEYCODE_DPAD_DOWN
                 && code != KeyEvent.KEYCODE_DPAD_LEFT && code != KeyEvent.KEYCODE_DPAD_RIGHT) return false;
         if (event.getAction() != KeyEvent.ACTION_DOWN) return true;
@@ -865,6 +1032,34 @@ final class StudioHome {
             }
         }
         go(tabs, 0);
+    }
+
+    /**
+     * The remote's Settings button while Home is on screen, as MainActivity does for the classic home: a key in
+     * settings_key_keycodes (config.xml, or the theme's config.json) opens the TV's Settings, or the quick settings
+     * panel with settings_key_panel. Other apps need HomeKeyService for it; this covers Home without one.
+     */
+    private boolean settingsKey(KeyEvent event) {
+        int code = event.getKeyCode();
+        if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0 && !KeyEvent.isGamepadButton(code)
+                && (code < KeyEvent.KEYCODE_DPAD_UP || code > KeyEvent.KEYCODE_DPAD_CENTER)) {
+            // Which code a remote button sends, for settings_key_keycodes: adb logcat -s NoirlyHome
+            android.util.Log.i("NoirlyHome", "key " + code + " (" + KeyEvent.keyCodeToString(code) + ") scan "
+                    + event.getScanCode());
+        }
+        boolean match = code == KeyEvent.KEYCODE_SETTINGS;
+        JSONArray own = cfg.optJSONArray("settings_key_keycodes");
+        if (own != null) {
+            for (int i = 0; i < own.length(); i++) match |= own.optInt(i, -1) == code;
+        } else {
+            for (int c : a.getResources().getIntArray(R.array.settings_key_keycodes)) match |= c == code;
+        }
+        if (!match) return false;
+        if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) {
+            boolean panel = cfg.optBoolean("settings_key_panel", a.getResources().getBoolean(R.bool.settings_key_panel));
+            open(panel ? new Intent(a, QuickSettingsActivity.class) : SystemSettings.intent(a, Settings.ACTION_SETTINGS));
+        }
+        return true;
     }
 
     private void go(List<View> views, int index) {
@@ -947,14 +1142,15 @@ final class StudioHome {
     }
 
     private View inputRow(String label, Runnable action) {
-        TextView row = displayText(16);
+        // JetBrains Mono capitals, like the tabs and button labels; quiet at rest, the accent pill on focus.
+        TextView row = label(12, p.text2);
         row.setText(label);
-        row.setPadding(px(14), px(9), px(14), px(9));
-        Drawable lit = rounded(p.accentSoft, 9, p.accent);
+        row.setPadding(px(14), px(11), px(14), px(11));
+        Drawable lit = rounded(p.accentSoft, 10, p.accent);
         row.setFocusable(true);
         row.setOnFocusChangeListener((v, f) -> {
             v.setBackground(f ? lit : null);
-            row.setTextColor(f ? p.accent : p.text);
+            row.setTextColor(f ? p.accent : p.text2);
         });
         row.setOnClickListener(v -> action.run());
         return row;

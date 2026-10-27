@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Rounded glass behind the forecast days and the Change city button. -->
+<!-- Noirly's ghost button for Change city: a hairline at rest, the gold accent while focused. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_focused="true">
         <shape android:shape="rectangle">
-            <solid android:color="#FFFFFFFF" />
+            <solid android:color="#FFFFE66D" />
             <corners android:radius="100dp" />
         </shape>
     </item>
     <item>
         <shape android:shape="rectangle">
-            <solid android:color="#33FFFFFF" />
-            <stroke android:width="1dp" android:color="#33FFFFFF" />
+            <solid android:color="#09F5F3EA" />
+            <stroke android:width="1dp" android:color="#2EF5F3EA" />
             <corners android:radius="100dp" />
         </shape>
     </item>

@@ -7,6 +7,11 @@
     <!-- The Photos Picker API and the picked photos' downloads. Nothing else goes online. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- The screensaver reads the weather now from the Weather add-on's read-only provider, if it is installed. -->
+    <queries>
+        <provider android:authorities="io.github.sumyabazar1.weather.now" />
+    </queries>
+
     <application
         android:allowBackup="false"
         android:banner="@drawable/banner"

@@ -24,6 +24,11 @@ steps by scanning a QR code on the TV:
 **Choose again** replaces the set; **Remove** deletes it. Videos are skipped. Left and Right step through the
 slideshow; Back leaves it.
 
+**Slideshow options**, on the row under the buttons: **Every …** steps through 10 s, 30 s, 1 min and 5 min per photo,
+and **Shuffle** plays them in random order (on by default). Photos change at once, with no fade or zoom. At the
+bottom left, on a soft dark edge, sit the clock and date and, when the [Weather add-on](../weather/README.md) is
+installed, its icon, temperature and conditions. That block moves a few dp every minute so nothing burns in.
+
 **Screensaver.** On Android TV, pick **Noirly Photos** in Settings → Device Preferences → Screen saver. Google TV's
 settings list only Google's own screensaver, so set it over ADB instead:
 

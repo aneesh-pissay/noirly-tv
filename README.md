@@ -31,8 +31,8 @@ no flashing, and a one-line restore puts the TV back as it was.
 | Part | What it does |
 |---|---|
 | **Greeting** | Good morning, afternoon or evening, with an optional name, in Fraunces. |
-| **Inputs, Wi-Fi, Theme, Settings** | Round buttons. Inputs lists the HDMI ports, AV and Live TV. Theme opens the palette picker. Hold OK on Settings for the launcher's own settings. |
-| **Three app cards** | Your three main apps, each with its banner, a tagline and a soft glow in its own colour. |
+| **Inputs, Wi-Fi, Theme, Settings** | Round buttons. Inputs lists the HDMI ports, AV and Live TV. The Wi-Fi icon is green when online, orange when connected without internet and red when offline. Theme opens the palette picker. Hold OK on Settings for the launcher's own settings. |
+| **Three app cards** | Your three main apps, each with its banner, a tagline and a soft glow in its own colour. Hold OK on a card to choose any installed app for it; an app already on another card swaps places, and **Default** goes back to the theme's choice. |
 | **Your apps** | Every app as a card with its category, two rows at a time. Tabs above it (All, Entertainment, Music, …, Other) filter the grid as you move along them. |
 | **The bar** | Round icons of your favourite apps, the weather now and the clock with the date. |
 | **Background** | Noirly's ambient page: a light from the top, a faint blueprint grid, soft accent glows, a vignette and fine grain. It is drawn once, so it costs nothing while you watch. |
@@ -131,7 +131,7 @@ A minimal Studio Home theme:
 | `studio_home` | `true` turns Studio Home on. Without it the launcher shows its classic home. |
 | `greeting_name` | The name after the greeting. Leave it out for just "Good morning". |
 | `studio_subtitle` | The line under the greeting. |
-| `dock_apps` | The first three are the large app cards. |
+| `dock_apps` | The first three are the large app cards, until you pick others by holding OK on a card. |
 | `studio_apps` | Which apps come first in Your apps, in order. The rest follow by name. |
 | `studio_dock` | The round icons in the bar. |
 | `studio_taglines`, `studio_categories` | Objects keyed by package, for a card's tagline and an app's category tab. |
@@ -139,6 +139,8 @@ A minimal Studio Home theme:
 | `live_tv_package` | The TV app that the Inputs list's Live TV opens. |
 | `studio_palette`, `studio_mode` | The starting palette (`blue`, `gold`, `forest`, `coral`, `violet`, `teal`, `rose`) and `dark` or `light`. The Theme button overrides both. |
 | `studio_weather_place` | `false` hides the city in the weather. |
+| `wifi_label_width` | Width in dp for the network name under the Wi-Fi button, cut with an ellipsis ("Offline" when there is none). `0`, the default, keeps the label "Wi-Fi". |
+| `settings_key_keycodes` | Remote buttons that open Settings while Home is on screen, by keycode. A TCL Google TV gear sends `[83]`; to find yours, press it on Home and read `adb logcat -s NoirlyHome`. `settings_key_panel: true` opens the quick settings panel instead. |
 
 ## Undo
 
