@@ -99,11 +99,11 @@ class RootTest(unittest.TestCase):
             root = valid(tmp)
             # A tree whose tables are stale: a run that got as far as render() would rewrite README.md.
             add(root, "tcl-c", tv("TCL C", "TCL"))
-            before = (root / "README.md").read_bytes()
+            before = (root / "CLEANYOURTV.md").read_bytes()
             (root / "examples" / "README.md").unlink()
             code, _, err = run("--root", str(root))
             self.assertEqual(code, 2, err)
-            self.assertEqual((root / "README.md").read_bytes(), before)
+            self.assertEqual((root / "CLEANYOURTV.md").read_bytes(), before)
 
 
 class AdoptTest(unittest.TestCase):
@@ -146,10 +146,10 @@ class AdoptTest(unittest.TestCase):
             add(root, "tcl-d", None)  # a folder with a list and no tv.json: what --adopt exists to write
             patch = Path(tmp) / "pr.diff"
             patch.write_text("| `tcl-d/` | TCL D | Android TV 11 | ads off |\n", encoding="utf-8")
-            (root / "README.md").unlink()
+            (root / "CLEANYOURTV.md").unlink()
             code, out, err = run("--root", str(root), "--adopt", str(patch))
             self.assertEqual(code, 2, err)
-            self.assertIn("README.md", err)
+            self.assertIn("CLEANYOURTV.md", err)
             self.assertFalse((root / "examples" / "tcl-d" / "tv.json").exists(), "the patch was applied anyway")
             self.assertEqual(out, "")
 

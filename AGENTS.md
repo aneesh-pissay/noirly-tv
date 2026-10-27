@@ -62,7 +62,8 @@ share their TV's list afterwards, follow [`docs/workflows/tv-list.md`](docs/work
 | Path | What it is |
 |---|---|
 | `PROMPT.md` | The prompt people paste into their agent. Brand-neutral; safety rules live here. |
-| `README.md` | Front page, with the TV table (generated from `examples/*/tv.json` by `tools/gen_tables.py`) and the Tools table. `README.zh-CN.md` and `README.vi.md` are translations. |
+| `README.md` | The Noirly TV front page: Studio Home, the Theme picker, the weather, setup and `config.json` keys. Its screenshots are in `docs/screenshots/`. |
+| `CLEANYOURTV.md` | The upstream Clean Your TV guide, with the TV table (generated from `examples/*/tv.json` by `tools/gen_tables.py`) and the Tools table. |
 | `CONTRIBUTING.md` | The contributor guide for people. "Where does my idea go?" is the routing table. |
 | `SECURITY.md` | Private vulnerability reporting. |
 | `SHOWCASE.md` | Projects built on this repo that live in their own repositories. |

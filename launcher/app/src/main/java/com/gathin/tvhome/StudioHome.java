@@ -73,7 +73,8 @@ import java.util.concurrent.Executors;
  *
  * Theme keys it reads: studio_home, greeting_name, studio_subtitle, dock_apps (the first three are the hero
  * cards), studio_apps (order of Your apps), studio_dock (the round icons), studio_taglines and
- * studio_categories (objects keyed by package), hidden_apps, live_tv_package.
+ * studio_categories (objects keyed by package), hidden_apps, live_tv_package, studio_palette and studio_mode (the
+ * Theme button's defaults), studio_weather_place (false hides the city in the weather block).
  */
 final class StudioHome {
     private static final int COLUMNS = 4;
@@ -1090,8 +1091,11 @@ final class StudioHome {
                     installed = true;
                     if (c.moveToFirst()) {
                         temp = c.getInt(c.getColumnIndexOrThrow("temp")) + "°";
-                        sky = c.getString(c.getColumnIndexOrThrow("sky")) + " · "
-                                + c.getString(c.getColumnIndexOrThrow("place"));
+                        sky = c.getString(c.getColumnIndexOrThrow("sky"));
+                        // "studio_weather_place": false in the theme leaves the city off the screen.
+                        if (cfg.optBoolean("studio_weather_place", true)) {
+                            sky += " · " + c.getString(c.getColumnIndexOrThrow("place"));
+                        }
                         // An add-on from before the code column: words only, no icon.
                         int code = c.getColumnIndex("code"), day = c.getColumnIndex("day");
                         if (code >= 0) icon = weatherIcon(c.getInt(code), day < 0 || c.getInt(day) == 1);

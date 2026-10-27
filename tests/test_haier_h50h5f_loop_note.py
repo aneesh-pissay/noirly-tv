@@ -15,7 +15,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 TROUBLE = ROOT / "docs" / "TROUBLESHOOTING.md"
-README = ROOT / "README.md"
+README = ROOT / "CLEANYOURTV.md"
 AQUA = ROOT / "examples" / "aqua-matrixtv-ee-50" / "debloat.txt"
 TITLE = "- **The TV restarts in a loop after a debloat**"
 

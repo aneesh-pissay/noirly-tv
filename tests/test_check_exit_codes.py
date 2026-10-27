@@ -30,7 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_drift_check import FAKE_TV  # noqa: E402  (the simulated TV check.py already runs against)
 
 ROOT = Path(__file__).resolve().parents[1]
-README = ROOT / "README.md"
+README = ROOT / "CLEANYOURTV.md"
 CHECK = ROOT / "tools" / "check.py"
 STOCK = "com.google.android.tvlauncher"
 CUSTOM = "com.gathin.tvhome"

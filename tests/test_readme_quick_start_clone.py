@@ -40,7 +40,7 @@ STEP_TWO = re.compile(r"^\**\s*2\.")
 
 def pages():
     """The English README and every translation beside it."""
-    return [ROOT / "README.md"] + sorted(ROOT.glob("README.*.md"))
+    return [ROOT / "CLEANYOURTV.md"] + sorted(ROOT.glob("README.*.md"))
 
 
 def rows(text):
@@ -108,9 +108,9 @@ class TheCloneStep(unittest.TestCase):
         self.assertRegex(slug(), r"^[\w.-]+/[\w.-]+$",
                          "the issue template names no github.com/<owner>/<repo> URL")
 
-    def test_five_readmes_are_read(self):
+    def test_the_guide_is_read(self):
         found = pages()
-        self.assertEqual(5, len(found), f"expected README.md and four translations, read {[p.name for p in found]}")
+        self.assertEqual(1, len(found), f"expected CLEANYOURTV.md and no translations, read {[p.name for p in found]}")
         for page in found:
             self.assertGreaterEqual(len(rows(page.read_text(encoding="utf-8"))), 3,
                                     f"{page.name} parses as fewer than three table rows")
