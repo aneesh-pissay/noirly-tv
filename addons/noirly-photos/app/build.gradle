@@ -1,0 +1,50 @@
+plugins {
+    id 'com.android.application'
+}
+
+// The Web application OAuth client (README, "Google Cloud setup"). oauth.properties is git-ignored: the secret never
+// lands in the repository. Without it the app builds and says sign-in is not set up.
+def oauth = new Properties()
+def oauthFile = rootProject.file('oauth.properties')
+if (oauthFile.exists()) oauthFile.withInputStream { oauth.load(it) }
+def quoted = { String key -> '"' + (oauth.getProperty(key) ?: '').trim() + '"' }
+
+android {
+    namespace 'dev.noirly.tv.photos'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'dev.noirly.tv.photos'
+        minSdk 26
+        targetSdk 34
+        versionCode 2
+        versionName '1.1'
+        buildConfigField 'String', 'OAUTH_CLIENT_ID', quoted('client_id')
+        buildConfigField 'String', 'OAUTH_CLIENT_SECRET', quoted('client_secret')
+        buildConfigField 'String', 'OAUTH_REDIRECT_URI', quoted('redirect_uri')
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
+            // Sideloaded over ADB like the launcher: signed with the debug key. Sign your own releases with your key.
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    // The QR code the phone scans to open the Google Photos picker.
+    implementation 'com.google.zxing:core:3.5.3'
+}

@@ -1,0 +1,71 @@
+<!doctype html>
+<!--
+  Noirly Photos sign-in hand-off (README, "Google Cloud setup"). Google sends the phone here after consent with
+  ?code=...&state=<nonce>.<topic>. This page posts that query, once, to https://ntfy.sh/<topic>, a random topic only
+  this sign-in knows, and the TV reads it from there. Nothing else: no scripts from elsewhere, no storage, no
+  analytics. The code is worthless without the PKCE verifier that never leaves the TV, and it expires in minutes.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Noirly Photos</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; min-height: 100vh; background: #0a0a08; color: #f5f3ea;
+         font: 17px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; display: grid; place-items: center; }
+  main { max-width: 30rem; padding: 2rem 1.5rem; }
+  p.eyebrow { font: 600 .7rem ui-monospace, monospace; letter-spacing: .22em; text-transform: uppercase;
+              color: rgb(245 243 234 / .49); margin: 0 0 1rem; }
+  h1 { font: 700 2rem/1.1 Georgia, serif; letter-spacing: -.02em; margin: 0 0 .75rem; }
+  p { color: rgb(245 243 234 / .68); margin: 0 0 1rem; }
+  button { margin-top: .5rem; padding: .8rem 1.4rem; border: 0; border-radius: 99px; background: #ffe66d;
+           color: #222; font: 600 .75rem ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
+</style>
+</head>
+<body>
+<main>
+  <p class="eyebrow">Noirly Photos</p>
+  <h1 id="head">Sending to your TV</h1>
+  <p id="words">One moment.</p>
+  <button id="again" hidden>Try again</button>
+</main>
+<script>
+(function () {
+  var params = new URLSearchParams(location.search);
+  var head = document.getElementById('head'), words = document.getElementById('words');
+  var again = document.getElementById('again');
+  function say(h, w) { head.textContent = h; words.textContent = w; }
+
+  var state = params.get('state') || '';
+  var dot = state.indexOf('.');
+  var topic = dot > 0 ? state.slice(dot + 1) : '';
+  // Only a topic the TV made: "noirly-" and 32 random URL-safe characters.
+  if (!/^noirly-[A-Za-z0-9_-]{24,48}$/.test(topic) || !(params.get('code') || params.get('error'))) {
+    say('Nothing to send', 'Open this page by scanning the sign-in code on the TV.');
+    return;
+  }
+  // The code is in the address bar now; take it out of history once it is read.
+  history.replaceState(null, '', location.pathname);
+
+  function send() {
+    again.hidden = true;
+    say('Sending to your TV', 'One moment.');
+    fetch('https://ntfy.sh/' + topic, { method: 'POST', body: params.toString(), cache: 'no-store' })
+      .then(function (r) {
+        if (!r.ok) throw new Error('ntfy ' + r.status);
+        if (params.get('error')) say('Not allowed', 'Google did not give Noirly Photos access. Go back to the TV to try again.');
+        else say('Signed in', 'Look at the TV: it shows the next step. You can close this page.');
+      })
+      .catch(function () {
+        say('Could not reach the TV', 'Check that the phone is online, then try again.');
+        again.hidden = false;
+      });
+  }
+  again.addEventListener('click', send);
+  send();
+})();
+</script>
+</body>
+</html>

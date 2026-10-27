@@ -1,0 +1,4 @@
+# Copy to oauth.properties (git-ignored) and fill in from Google Cloud: Clients -> your Web application client.
+client_id=1234567890-abc.apps.googleusercontent.com
+client_secret=GOCSPX-...
+redirect_uri=https://aneesh-pissay.github.io/noirly-tv/oauth/

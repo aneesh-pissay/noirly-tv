@@ -68,7 +68,7 @@ import java.util.concurrent.Executors;
  * Settings buttons with labels, three hero cards with a tagline, "Your apps" as wide cards with a category,
  * and a glass bar of round app icons with the clock. MainActivity hands its window to this class when the
  * pushed theme sets "studio_home": true; nothing else in the launcher changes. Like the rest of the
- * launcher it never goes online: the weather in the bar comes from the Weather add-on (addons/weather), which
+ * launcher it never goes online: the weather in the bar comes from the Weather add-on (io.github.sumyabazar1.weather), which
  * reads Open-Meteo itself, through its read-only NowProvider. Without the add-on the bar has no weather.
  *
  * Theme keys it reads: studio_home, greeting_name, studio_subtitle, dock_apps (the first three are the hero
@@ -122,6 +122,7 @@ final class StudioHome {
         tag("com.tcl.miracast", "Mirror your phone.", "Connectivity");
         tag("com.android.vending", "Get more apps.", "System");
         tag("io.github.sumyabazar1.weather", "The forecast for your city.", "Utilities");
+        tag("dev.noirly.tv.photos", "Your Google Photos.", "Photos & Videos");
     }
 
     private static void tag(String pkg, String tagline, String category) {
