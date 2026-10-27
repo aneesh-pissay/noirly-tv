@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/home-dark.jpg" alt="Noirly TV in Warm Gold, dark: a greeting in Fraunces, three large app cards, Your apps with category tabs, and a glass bar with round app icons, the weather and the clock" width="900">
+  <img src="docs/screenshots/home-dark.jpg" alt="Noirly TV in Warm Gold, dark: a greeting in Inter Display, three large app cards, Your apps with category tabs, and a glass bar with round app icons, the weather and the clock" width="900">
 </p>
 
 Noirly TV takes a stock Android TV, switches off the manufacturer's ads, telemetry and preloaded apps, and
@@ -30,7 +30,7 @@ no flashing, and a one-line restore puts the TV back as it was.
 
 | Part | What it does |
 |---|---|
-| **Greeting** | Good morning, afternoon or evening, with an optional name, in Fraunces. |
+| **Greeting** | Good morning, afternoon or evening, with an optional name, in Inter Display. |
 | **Inputs, Wi-Fi, Theme, Settings** | Round buttons. Inputs lists the HDMI ports, AV and Live TV. The Wi-Fi icon is green when online, orange when connected without internet and red when offline. Theme opens the palette picker. Hold OK on Settings for the launcher's own settings. |
 | **Three app cards** | Your three main apps, each with its banner, a tagline and a soft glow in its own colour. Hold OK on a card to choose any installed app for it; an app already on another card swaps places, and **Default** goes back to the theme's choice. |
 | **Your apps** | Every app as a card with its category, two rows at a time. Tabs above it (All, Entertainment, Music, …, Other) filter the grid as you move along them. |
@@ -47,7 +47,7 @@ The colours and type come from the Noirly design system, the same one as the Noi
 - **Seven palettes:** Ocean Blue, Warm Gold, Forest Green, Coral Ember, Soft Violet, Deep Teal and Rose Quartz.
   Each comes in dark and light. Every colour on the screen comes from the palette's five base colours
   (background, surface, text, accent and accent ink), worked out the same way as the web build.
-- **Type:** [Fraunces](https://fonts.google.com/specimen/Fraunces) for titles and numbers,
+- **Type:** [Inter Display](https://rsms.me/inter/) (an open SF Pro look-alike) for titles and numbers,
   [Hanken Grotesk](https://fonts.google.com/specimen/Hanken+Grotesk) for text and
   [JetBrains Mono](https://fonts.google.com/specimen/JetBrains+Mono) in capitals for labels. The launcher
   carries small Latin subsets of each; any other character falls back to the TV's own font.
@@ -163,6 +163,6 @@ Everything here can be undone. `tools/restore.sh` with the same list re-enables 
 Noirly TV is a fork of [Clean Your TV](https://github.com/Gathin23/cleanyourtv) by Gathin and its contributors.
 The debloat lists, tools and launcher base come from that project. The Weather add-on is by
 [Sumyabazar1](https://github.com/Sumyabazar1), and its data comes from [Open-Meteo](https://open-meteo.com/).
-Fraunces, Hanken Grotesk and JetBrains Mono are under the SIL Open Font Licence.
+Inter, Hanken Grotesk and JetBrains Mono are under the SIL Open Font Licence.
 
 Released under the [MIT licence](LICENSE), as the original is.

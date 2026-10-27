@@ -31,7 +31,7 @@ final class NoirlyBackdrop {
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
 
         // Wash: light gathering at the top, shadow at the bottom edge, and the accent beam from above.
-        paint.setShader(new LinearGradient(0, 0, 0, h, new int[]{p.washTop, p.bg, p.bg, p.washBottom},
+        paint.setShader(new LinearGradient(0, 0, 0, h, new int[]{p.washTop, p.page, p.page, p.washBottom},
                 new float[]{0f, 0.38f, 0.64f, 1f}, Shader.TileMode.CLAMP));
         c.drawRect(0, 0, w, h, paint);
         paint.setShader(ellipse(w * 0.5f, -h * 0.06f, w * 0.78f, h * 0.42f,
@@ -84,19 +84,24 @@ final class NoirlyBackdrop {
         return g;
     }
 
-    /** Fine noise mixed in at the web's grain opacity, so the big gradients do not band on the TV. */
+    /**
+     * Fine noise at the web's grain opacity, so the big gradients do not band on the TV. It nudges each pixel
+     * lighter or darker rather than towards grey, so the colour underneath stays clean.
+     */
     private static void grain(Bitmap b, float amount) {
         int w = b.getWidth(), h = b.getHeight();
         int[] px = new int[w * h];
         b.getPixels(px, 0, w, 0, 0, w, h);
         Random random = new Random(7);
         for (int i = 0; i < px.length; i++) {
-            int n = random.nextInt(256), c = px[i];
-            int r = Color.red(c), g = Color.green(c), bl = Color.blue(c);
-            px[i] = Color.rgb(Math.round(r + (n - r) * amount), Math.round(g + (n - g) * amount),
-                    Math.round(bl + (n - bl) * amount));
+            int n = Math.round((random.nextInt(256) - 128) * amount), c = px[i];
+            px[i] = Color.rgb(clamp(Color.red(c) + n), clamp(Color.green(c) + n), clamp(Color.blue(c) + n));
         }
         b.setPixels(px, 0, w, 0, 0, w, h);
+    }
+
+    private static int clamp(int v) {
+        return Math.max(0, Math.min(255, v));
     }
 
     private static int transparent(int c) {

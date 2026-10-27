@@ -33,7 +33,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
-        android:fontFamily="@font/noirly_fraunces_bold"
+        android:fontFamily="@font/noirly_inter_bold"
         android:letterSpacing="-0.02"
         android:textColor="#FFF5F3EA"
         android:textSize="26sp" />

@@ -32,8 +32,12 @@ final class NoirlyPalette {
     final int accent, accentInk, accentSoft;
     /** The card gradient's two ends (.surface), the chip's faint fill (.chip). */
     final int cardTop, cardBottom, chipFill;
-    /** The ambient background's layers (styles.css, "Ambient page background"). */
-    final int beam, blobAccent, blobAccentSoft, blobNeutral, gridLine, vignette, washTop, washBottom;
+    /**
+     * The ambient background's layers (styles.css, "Ambient page background"). page is its base: a medium tone
+     * tinted with the accent, lighter than the near-black dark bg and deeper than the near-white light one, so
+     * the glass cards and the bar stand out against it.
+     */
+    final int page, beam, blobAccent, blobAccentSoft, blobNeutral, gridLine, vignette, washTop, washBottom;
     final float grain;
 
     /** The palette for id (gold when unknown), light or dark. */
@@ -57,15 +61,17 @@ final class NoirlyPalette {
             accentSoft = alpha(accent, 0.14f);
             cardTop = mix(surface, text, 0.07f);
             cardBottom = mix(surface, text, 0.02f);
-            beam = alpha(accent, 0.09f);
-            blobAccent = alpha(accent, 0.14f);
-            blobAccentSoft = alpha(accent, 0.08f);
-            blobNeutral = alpha(text, 0.08f);
-            gridLine = alpha(text, 0.07f);
-            vignette = alpha(bgDeep, 0.62f);
-            washTop = mix(bg, text, 0.05f);
-            washBottom = bgDeep;
-            grain = 0.045f;
+            // A deep, clean colour in the accent's hue (no grey mixed in); the wash only lightens and darkens it.
+            page = tone(accent, 0.5f, 0.17f);
+            beam = alpha(accent, 0.12f);
+            blobAccent = alpha(accent, 0.18f);
+            blobAccentSoft = alpha(accent, 0.1f);
+            blobNeutral = alpha(tone(accent, 0.45f, 0.3f), 0.35f);
+            gridLine = alpha(text, 0.035f);
+            vignette = alpha(bgDeep, 0.4f);
+            washTop = tone(accent, 0.45f, 0.24f);
+            washBottom = tone(accent, 0.55f, 0.09f);
+            grain = 0.02f;
         } else {
             bgDeep = mix(bg, text, 0.12f);
             surface2 = mix(surface, text, 0.08f);
@@ -76,15 +82,17 @@ final class NoirlyPalette {
             accentSoft = alpha(accent, 0.1f);
             cardTop = mix(surface, Color.WHITE, 0.9f);
             cardBottom = mix(surface, bg, 0.28f);
-            beam = alpha(accent, 0.07f);
-            blobAccent = alpha(accent, 0.1f);
-            blobAccentSoft = alpha(accent, 0.06f);
-            blobNeutral = alpha(text, 0.06f);
-            gridLine = alpha(text, 0.055f);
-            vignette = alpha(bgDeep, 0.32f);
-            washTop = mix(bg, surface, 0.85f);
-            washBottom = mix(bg, bgDeep, 0.7f);
-            grain = 0.03f;
+            // A soft, clean tint of the accent's hue (no grey mixed in), deep enough for the white glass to show.
+            page = tone(accent, 0.14f, 0.88f);
+            beam = alpha(accent, 0.1f);
+            blobAccent = alpha(accent, 0.14f);
+            blobAccentSoft = alpha(accent, 0.09f);
+            blobNeutral = alpha(Color.WHITE, 0.35f);
+            gridLine = alpha(text, 0.035f);
+            vignette = alpha(tone(accent, 0.35f, 0.45f), 0.16f);
+            washTop = tone(accent, 0.08f, 0.95f);
+            washBottom = tone(accent, 0.2f, 0.8f);
+            grain = 0.02f;
         }
         hairlineStrong = alpha(text, 0.18f);
         chipFill = alpha(text, 0.035f);
@@ -106,6 +114,15 @@ final class NoirlyPalette {
         return Color.rgb(Math.round(Color.red(a) + (Color.red(b) - Color.red(a)) * f),
                 Math.round(Color.green(a) + (Color.green(b) - Color.green(a)) * f),
                 Math.round(Color.blue(a) + (Color.blue(b) - Color.blue(a)) * f));
+    }
+
+    /** The colour's hue at the given saturation and brightness (HSV). */
+    static int tone(int c, float saturation, float value) {
+        float[] hsv = new float[3];
+        Color.colorToHSV(c, hsv);
+        hsv[1] = saturation;
+        hsv[2] = value;
+        return Color.HSVToColor(hsv);
     }
 
     static int alpha(int c, float a) {

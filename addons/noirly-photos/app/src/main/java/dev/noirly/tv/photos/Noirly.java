@@ -11,7 +11,7 @@ import android.widget.TextView;
 
 /**
  * Noirly's Warm Gold, dark (noirly-ui themes/index.ts), and its three faces, as the Noirly TV launcher draws them:
- * Fraunces for titles, Hanken Grotesk for copy, JetBrains Mono in capitals for labels.
+ * Inter Display for titles, Hanken Grotesk for copy, JetBrains Mono in capitals for labels.
  */
 final class Noirly {
     static final int BG = 0xFF0A0A08;
@@ -32,7 +32,7 @@ final class Noirly {
     Noirly(Context ctx) {
         this.ctx = ctx;
         dp = ctx.getResources().getDisplayMetrics().density;
-        display = ctx.getResources().getFont(R.font.noirly_fraunces_bold);
+        display = ctx.getResources().getFont(R.font.noirly_inter_bold);
         body = ctx.getResources().getFont(R.font.noirly_hanken_regular);
         mono = ctx.getResources().getFont(R.font.noirly_mono_medium);
     }

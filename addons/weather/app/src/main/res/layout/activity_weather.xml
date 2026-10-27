@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Full screen on a 1080p TV (960 x 540 dp). Noirly Warm Gold, dark: a near-black page with a faint glow in the
-     weather's colour (Forecast.backdrop); Fraunces for figures, Hanken Grotesk for copy, JetBrains Mono for labels. -->
+     weather's colour (Forecast.backdrop); Inter Display for figures, Hanken Grotesk for copy, JetBrains Mono for labels. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/root"
     android:layout_width="match_parent"
@@ -38,7 +38,7 @@
                 android:id="@+id/temp"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:fontFamily="@font/noirly_fraunces_bold"
+                android:fontFamily="@font/noirly_inter_bold"
                 android:includeFontPadding="false"
                 android:letterSpacing="-0.04"
                 android:textColor="#FFF5F3EA"
@@ -54,7 +54,7 @@
                     android:id="@+id/sky"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:fontFamily="@font/noirly_fraunces_bold"
+                    android:fontFamily="@font/noirly_inter_bold"
                     android:letterSpacing="-0.02"
                     android:textColor="#FFF5F3EA"
                     android:textSize="30sp" />
