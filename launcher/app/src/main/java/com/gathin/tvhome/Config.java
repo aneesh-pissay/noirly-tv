@@ -397,6 +397,13 @@ final class Config {
         return ctx.getExternalFilesDir(null);
     }
 
+    /** The pushed theme's config.json as it is, or null without one; for keys that only StudioHome reads. */
+    static JSONObject overlay(Context ctx) {
+        File dir = dir(ctx);
+        return readOverlay(ctx, dir != null ? new File(dir, FILE_NAME) : null,
+                Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState()));
+    }
+
     static Config load(Context ctx) {
         Resources res = ctx.getResources();
         List<String> dock = new ArrayList<>(Arrays.asList(res.getStringArray(R.array.dock_apps)));
