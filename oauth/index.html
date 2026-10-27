@@ -1,0 +1,65 @@
+<!doctype html>
+<!--
+  Noirly Photos sign-in hand-off (README, "Google Cloud setup"). Google sends the phone here after consent with
+  ?code=...&state=<nonce>.<base64url of the TV's ip:port>. This page passes them on to the TV on the same Wi-Fi,
+  http://<tv>/callback, and nothing else: no scripts from elsewhere, no storage, no analytics. Only private IPv4
+  addresses are accepted, so the page cannot be used to send anyone to another site.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Noirly Photos</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; min-height: 100vh; background: #0a0a08; color: #f5f3ea;
+         font: 17px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; display: grid; place-items: center; }
+  main { max-width: 30rem; padding: 2rem 1.5rem; }
+  p.eyebrow { font: 600 .7rem ui-monospace, monospace; letter-spacing: .22em; text-transform: uppercase;
+              color: rgb(245 243 234 / .49); margin: 0 0 1rem; }
+  h1 { font: 700 2rem/1.1 Georgia, serif; letter-spacing: -.02em; margin: 0 0 .75rem; }
+  p { color: rgb(245 243 234 / .68); margin: 0 0 1rem; }
+  a.button { display: inline-block; margin-top: .5rem; padding: .8rem 1.4rem; border-radius: 99px;
+             background: #ffe66d; color: #222; text-decoration: none;
+             font: 600 .75rem ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
+</style>
+</head>
+<body>
+<main>
+  <p class="eyebrow">Noirly Photos</p>
+  <h1 id="head">Sending to your TV</h1>
+  <p id="words">One moment.</p>
+  <a class="button" id="go" hidden>Send to the TV</a>
+</main>
+<script>
+(function () {
+  var params = new URLSearchParams(location.search);
+  var head = document.getElementById('head'), words = document.getElementById('words'), go = document.getElementById('go');
+  function say(h, w) { head.textContent = h; words.textContent = w; }
+
+  var state = params.get('state') || '';
+  var dot = state.indexOf('.');
+  var tv = '';
+  try {
+    tv = atob(state.slice(dot + 1).replace(/-/g, '+').replace(/_/g, '/'));
+  } catch (e) { tv = ''; }
+  var privateAddress = /^(10\.\d{1,3}|192\.168|172\.(1[6-9]|2\d|3[01]))\.\d{1,3}\.\d{1,3}:\d{2,5}$/;
+  if (dot < 1 || !privateAddress.test(tv)) {
+    say('Nothing to send', 'Open this page by scanning the sign-in code on the TV.');
+    return;
+  }
+  if (params.get('error')) {
+    say('Sign-in was not allowed', 'Google said: ' + params.get('error') + '. Go back to the TV and try again.');
+  }
+  var target = 'http://' + tv + '/callback?' + params.toString();
+  go.href = target;
+  go.hidden = false;
+  if (!params.get('error')) {
+    say('Sending to your TV', 'If nothing happens, check that the phone is on the same Wi-Fi as the TV, then press the button.');
+    location.replace(target);
+  }
+})();
+</script>
+</body>
+</html>
