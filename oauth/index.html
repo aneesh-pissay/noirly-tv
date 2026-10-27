@@ -1,9 +1,9 @@
 <!doctype html>
 <!--
   Noirly Photos sign-in hand-off (README, "Google Cloud setup"). Google sends the phone here after consent with
-  ?code=...&state=<nonce>.<base64url of the TV's ip:port>. This page passes them on to the TV on the same Wi-Fi,
-  http://<tv>/callback, and nothing else: no scripts from elsewhere, no storage, no analytics. Only private IPv4
-  addresses are accepted, so the page cannot be used to send anyone to another site.
+  ?code=...&state=<nonce>.<topic>. This page posts that query, once, to https://ntfy.sh/<topic>, a random topic only
+  this sign-in knows, and the TV reads it from there. Nothing else: no scripts from elsewhere, no storage, no
+  analytics. The code is worthless without the PKCE verifier that never leaves the TV, and it expires in minutes.
 -->
 <html lang="en">
 <head>
@@ -20,9 +20,8 @@
               color: rgb(245 243 234 / .49); margin: 0 0 1rem; }
   h1 { font: 700 2rem/1.1 Georgia, serif; letter-spacing: -.02em; margin: 0 0 .75rem; }
   p { color: rgb(245 243 234 / .68); margin: 0 0 1rem; }
-  a.button { display: inline-block; margin-top: .5rem; padding: .8rem 1.4rem; border-radius: 99px;
-             background: #ffe66d; color: #222; text-decoration: none;
-             font: 600 .75rem ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
+  button { margin-top: .5rem; padding: .8rem 1.4rem; border: 0; border-radius: 99px; background: #ffe66d;
+           color: #222; font: 600 .75rem ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
 </style>
 </head>
 <body>
@@ -30,35 +29,42 @@
   <p class="eyebrow">Noirly Photos</p>
   <h1 id="head">Sending to your TV</h1>
   <p id="words">One moment.</p>
-  <a class="button" id="go" hidden>Send to the TV</a>
+  <button id="again" hidden>Try again</button>
 </main>
 <script>
 (function () {
   var params = new URLSearchParams(location.search);
-  var head = document.getElementById('head'), words = document.getElementById('words'), go = document.getElementById('go');
+  var head = document.getElementById('head'), words = document.getElementById('words');
+  var again = document.getElementById('again');
   function say(h, w) { head.textContent = h; words.textContent = w; }
 
   var state = params.get('state') || '';
   var dot = state.indexOf('.');
-  var tv = '';
-  try {
-    tv = atob(state.slice(dot + 1).replace(/-/g, '+').replace(/_/g, '/'));
-  } catch (e) { tv = ''; }
-  var privateAddress = /^(10\.\d{1,3}|192\.168|172\.(1[6-9]|2\d|3[01]))\.\d{1,3}\.\d{1,3}:\d{2,5}$/;
-  if (dot < 1 || !privateAddress.test(tv)) {
+  var topic = dot > 0 ? state.slice(dot + 1) : '';
+  // Only a topic the TV made: "noirly-" and 32 random URL-safe characters.
+  if (!/^noirly-[A-Za-z0-9_-]{24,48}$/.test(topic) || !(params.get('code') || params.get('error'))) {
     say('Nothing to send', 'Open this page by scanning the sign-in code on the TV.');
     return;
   }
-  if (params.get('error')) {
-    say('Sign-in was not allowed', 'Google said: ' + params.get('error') + '. Go back to the TV and try again.');
+  // The code is in the address bar now; take it out of history once it is read.
+  history.replaceState(null, '', location.pathname);
+
+  function send() {
+    again.hidden = true;
+    say('Sending to your TV', 'One moment.');
+    fetch('https://ntfy.sh/' + topic, { method: 'POST', body: params.toString(), cache: 'no-store' })
+      .then(function (r) {
+        if (!r.ok) throw new Error('ntfy ' + r.status);
+        if (params.get('error')) say('Not allowed', 'Google did not give Noirly Photos access. Go back to the TV to try again.');
+        else say('Signed in', 'Look at the TV: it shows the next step. You can close this page.');
+      })
+      .catch(function () {
+        say('Could not reach the TV', 'Check that the phone is online, then try again.');
+        again.hidden = false;
+      });
   }
-  var target = 'http://' + tv + '/callback?' + params.toString();
-  go.href = target;
-  go.hidden = false;
-  if (!params.get('error')) {
-    say('Sending to your TV', 'If nothing happens, check that the phone is on the same Wi-Fi as the TV, then press the button.');
-    location.replace(target);
-  }
+  again.addEventListener('click', send);
+  send();
 })();
 </script>
 </body>
