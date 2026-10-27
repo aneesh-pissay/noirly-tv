@@ -25,6 +25,7 @@ import android.graphics.drawable.AdaptiveIconDrawable;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.TransitionDrawable;
 import android.media.tv.TvContract;
 import android.media.tv.TvInputInfo;
 import android.media.tv.TvInputManager;
@@ -90,8 +91,8 @@ final class StudioHome {
     private static final String THEME_PREFS = "studio_theme";
     /** The owner's app for each big card ("slot0".."slot2"), chosen by holding OK on it; over the theme's dock_apps. */
     private static final String HERO_PREFS = "studio_heroes";
-    /** Noirly's letter spacing: display type tight, mono labels wide (em). */
-    private static final float DISPLAY_TRACKING = -0.02f, LABEL_TRACKING = 0.14f;
+    /** Letter spacing for display type, slightly tight (Inter Display is already set close), in em. */
+    private static final float DISPLAY_TRACKING = -0.01f;
     /** The first tab under "Your apps", and the category the Settings card is filed under. */
     private static final String ALL = "All";
     private static final String SETTINGS_CATEGORY = "System";
@@ -156,10 +157,9 @@ final class StudioHome {
     private final float dp;
     /** Every colour on the page: one of Noirly's palettes, light or dark. */
     private final NoirlyPalette p;
-    /** Noirly's three faces: Fraunces for display and figures, Hanken Grotesk for copy, JetBrains Mono for labels. */
+    /** Two faces: Inter Display for titles, figures and labels, Hanken Grotesk for copy and subtitles. */
     private final Typeface display;
     private final Typeface body;
-    private final Typeface mono;
     private JSONObject cfg = new JSONObject();
     private String liveTvPkg = "";
 
@@ -205,6 +205,16 @@ final class StudioHome {
     private int lastTop, lastHero, lastCard, lastDock;
     private View focused;
     private boolean dirty;
+    /** The artwork on each hero card, which drifts a little as the focus moves along the row (parallax). */
+    private final List<View> heroArt = new ArrayList<>();
+    /** Each tab's colours, eased between rest, chosen and focused. */
+    private final Map<View, StudioMotion.Colors> tabColors = new HashMap<>();
+    private HorizontalScrollView tabScroll;
+    /** False when animations are off in Developer options: then nothing moves, it just changes. */
+    private final boolean motion;
+    private boolean paused;
+    /** Set just before a theme change recreates the activity: that Home appears at once, without the startup fade. */
+    private static boolean themeSwitch;
 
     private final BroadcastReceiver packages = new BroadcastReceiver() {
         @Override
@@ -218,9 +228,9 @@ final class StudioHome {
         a = activity;
         pm = a.getPackageManager();
         dp = a.getResources().getDisplayMetrics().density;
-        display = a.getResources().getFont(R.font.noirly_fraunces_bold);
+        motion = StudioMotion.on(a);
+        display = a.getResources().getFont(R.font.noirly_inter_bold);
         body = a.getResources().getFont(R.font.noirly_hanken_regular);
-        mono = a.getResources().getFont(R.font.noirly_mono_medium);
         // The palette and mode chosen with the Theme button; a theme's studio_palette / studio_mode are the defaults.
         JSONObject o = Config.overlay(a);
         SharedPreferences prefs = a.getSharedPreferences(THEME_PREFS, Context.MODE_PRIVATE);
@@ -231,7 +241,7 @@ final class StudioHome {
 
         // Noirly's ambient page background, drawn once (the theme's wallpaper.jpg is not used).
         root = new FrameLayout(a);
-        root.setBackgroundColor(p.bg);
+        root.setBackgroundColor(p.page);
         root.setClipChildren(false);
         ImageView backdrop = new ImageView(a);
         backdrop.setScaleType(ImageView.ScaleType.FIT_XY);
@@ -279,7 +289,7 @@ final class StudioHome {
         root.addView(yourApps, at(36, 244, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         // Category tabs under the title: All, then the categories of the apps in the grid (buildTabs).
-        HorizontalScrollView tabScroll = new HorizontalScrollView(a);
+        tabScroll = new HorizontalScrollView(a);
         tabScroll.setHorizontalScrollBarEnabled(false);
         tabScroll.setClipToPadding(false);
         tabScroll.setClipChildren(false);
@@ -315,7 +325,7 @@ final class StudioHome {
         LinearLayout bar = new LinearLayout(a);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setBackground(card(33, p.hairlineStrong));
+        bar.setBackground(glass(33, false));
         bar.setPadding(px(14), 0, px(26), 0);
         dockScroll = new HorizontalScrollView(a);
         dockScroll.setHorizontalScrollBarEnabled(false);
@@ -340,14 +350,17 @@ final class StudioHome {
         LinearLayout weatherWords = new LinearLayout(a);
         weatherWords.setOrientation(LinearLayout.VERTICAL);
         weatherTemp = displayText(22);
-        // Hanken, not the mono label: the wide caps would push the block over the last dock icon.
         weatherSky = text(11, p.text2, body);
+        StudioMotion.softText(weatherTemp);
+        StudioMotion.softText(weatherSky);
         weatherWords.addView(weatherTemp);
         weatherWords.addView(weatherSky);
         weather.addView(weatherWords);
         weather.setVisibility(View.GONE);
-        Drawable weatherLit = rounded(p.accentSoft, 12, p.accent, 2);
-        focusable(weather, 1.05f, hasFocus -> weather.setBackground(hasFocus ? weatherLit : null));
+        TransitionDrawable weatherLit = fader(rounded(Color.TRANSPARENT, 12, Color.TRANSPARENT),
+                rounded(p.accentSoft, 12, p.accent, 2));
+        weather.setBackground(weatherLit);
+        focusable(weather, 1.05f, hasFocus -> fade(weatherLit, hasFocus));
         weather.setOnClickListener(v -> {
             Intent i = pm.getLeanbackLaunchIntentForPackage(WEATHER_PKG);
             open(i != null ? i : pm.getLaunchIntentForPackage(WEATHER_PKG));
@@ -373,10 +386,10 @@ final class StudioHome {
         TextClock date = new TextClock(a);
         date.setFormat12Hour("EEE, d MMM");
         date.setFormat24Hour("EEE, d MMM");
-        style(date, 10, p.muted, mono);
-        // Tighter than the other labels, so the bar keeps room for every dock icon.
-        date.setLetterSpacing(0.04f);
-        date.setAllCaps(true);
+        // Hanken, as the weather's sky line beside it.
+        style(date, 11, p.text2, body);
+        StudioMotion.softText(clock);
+        StudioMotion.softText(date);
         clockBlock.addView(clock);
         clockBlock.addView(date);
         bar.addView(clockBlock);
@@ -399,9 +412,23 @@ final class StudioHome {
 
         rebuild();
         focusFirst();
+        // Startup: a short fade in, no splash and no wait. A theme change redraws at once instead.
+        if (motion && !themeSwitch) {
+            root.setAlpha(0f);
+            root.animate().alpha(1f).setDuration(StudioMotion.HERO_IN)
+                    .setInterpolator(StudioMotion.SETTLE).withLayer().start();
+        }
+        themeSwitch = false;
     }
 
     void onResume() {
+        // Back from an app: Home settles in from slightly faded rather than snapping.
+        if (paused && motion && root.getAlpha() == 1f) {
+            root.setAlpha(0.6f);
+            root.animate().alpha(1f).setDuration(StudioMotion.FOCUS_IN).setInterpolator(StudioMotion.SETTLE)
+                    .withLayer().start();
+        }
+        paused = false;
         updateGreeting();
         if (dirty) rebuild();
         if (focused != null && focused.isAttachedToWindow() && focused.getVisibility() == View.VISIBLE) {
@@ -422,6 +449,7 @@ final class StudioHome {
     }
 
     void onPause() {
+        paused = true;
         try {
             a.getSystemService(ConnectivityManager.class).unregisterNetworkCallback(net);
         } catch (RuntimeException ignored) {
@@ -463,6 +491,7 @@ final class StudioHome {
 
         heroRow.removeAllViews();
         heroes.clear();
+        heroArt.clear();
         allApps = apps;
         heroPkgs = heroPicks(apps, ordered);
         for (int slot = 0; slot < heroPkgs.size(); slot++) {
@@ -509,6 +538,7 @@ final class StudioHome {
         if (!names.contains(tab)) tab = ALL;
         tabRow.removeAllViews();
         tabs.clear();
+        tabColors.clear();
         for (String name : names) {
             View t = tabChip(name);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -520,16 +550,27 @@ final class StudioHome {
     }
 
     private View tabChip(String name) {
-        TextView t = label(10, p.text2);
-        t.setLetterSpacing(0.1f);
+        TextView t = label(11, p.text2);
         t.setText(name);
         t.setTag(name);
         t.setGravity(Gravity.CENTER);
         t.setPadding(px(14), 0, px(14), 0);
-        styleTab(t, false);
+        GradientDrawable pill = new GradientDrawable();
+        pill.setCornerRadius(px(15));
+        t.setBackground(pill);
+        int[] rest = tabStyle(name, false);
+        tabColors.put(t, new StudioMotion.Colors(c -> {
+            pill.setColor(c[0]);
+            pill.setStroke(px(1), c[1]);
+            t.setTextColor(c[2]);
+        }, rest));
         // Moving onto a tab shows its apps at once, as Google TV's tabs do; OK does the same.
         focusable(t, 1.06f, hasFocus -> {
-            if (hasFocus) selectTab(name);
+            if (hasFocus) {
+                selectTab(name);
+                // Keep the focused tab near the middle, so the next ones are always in sight.
+                tabScroll.post(() -> tabScroll.smoothScrollTo(t.getLeft() + t.getWidth() / 2 - tabScroll.getWidth() / 2, 0));
+            }
             styleTab(t, hasFocus);
         });
         t.setOnClickListener(v -> selectTab(name));
@@ -538,20 +579,18 @@ final class StudioHome {
 
     /**
      * Noirly's chip: faint fill and a hairline. Chosen: inverted, cream with dark words (its active state).
-     * Focused: gold, the ring colour.
+     * Focused: gold, the ring colour. The pill and its words ease from one to the next.
      */
     private void styleTab(TextView t, boolean hasFocus) {
-        boolean chosen = tab.equals(t.getTag());
-        if (hasFocus) {
-            t.setTextColor(p.accentInk);
-            t.setBackground(rounded(p.accent, 15, p.accent));
-        } else if (chosen) {
-            t.setTextColor(p.bg);
-            t.setBackground(rounded(p.text, 15, p.text));
-        } else {
-            t.setTextColor(p.text2);
-            t.setBackground(rounded(p.chipFill, 15, p.hairlineStrong));
-        }
+        StudioMotion.Colors c = tabColors.get(t);
+        if (c != null) c.to(StudioMotion.TAB, tabStyle((String) t.getTag(), hasFocus));
+    }
+
+    /** Fill, edge and words of a tab. */
+    private int[] tabStyle(String name, boolean hasFocus) {
+        if (hasFocus) return new int[]{p.accent, p.accent, p.accentInk};
+        if (tab.equals(name)) return new int[]{p.text, p.text, p.bg};
+        return new int[]{p.chipFill, p.hairlineStrong, p.text2};
     }
 
     private void selectTab(String name) {
@@ -561,6 +600,8 @@ final class StudioHome {
         fillGrid();
         gridScroll.scrollTo(0, 0);
         lastCard = 0;
+        // The new cards rise a few dp into place as they fade in; only the grid redraws, not the page.
+        if (motion) StudioMotion.reveal(grid, px(8), StudioMotion.GRID);
     }
 
     /** The app cards of the chosen tab, COLUMNS to a row, with the Settings card under All and System. */
@@ -672,7 +713,9 @@ final class StudioHome {
             rows.addView(row);
             if (on) current = row;
         }
+        StudioMotion.popup(popup);
         popup.showAsDropDown(anchor, (anchor.getWidth() - px(260)) / 2, -anchor.getHeight() / 2);
+        if (motion) StudioMotion.drop(scroll, px(6));
         View focus = current != null ? current : rows.getChildAt(1);
         focus.requestFocus();
     }
@@ -731,19 +774,23 @@ final class StudioHome {
         int color = art != null ? dominant(art) : dominant(icon(app));
         FrameLayout card = new FrameLayout(a);
         card.setClipToOutline(true);
-        // Noirly's .surface: the dark card gradient with a hairline, r-lg corners.
-        card.setBackground(card(18, p.hairlineStrong));
+        // The app's own colour, lit at the top left and deepening to the bottom right, with a faint light edge.
+        GradientDrawable fill = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{shade(color, 1.25f), color, shade(color, 0.55f)});
+        fill.setCornerRadius(px(18));
+        fill.setStroke(px(1), 0x33FFFFFF);
+        card.setBackground(fill);
         card.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
 
-        // Two soft circles, as the mockup's cards have: a faint aura of the app's own colour, and a neutral one.
+        // Two soft circles, as the mockup's cards have: a deeper one of the app's colour, and a light sheen.
         View blob = new View(a);
-        blob.setBackground(oval((color & 0x00FFFFFF) | 0x33000000));
+        blob.setBackground(oval((shade(color, 0.7f) & 0x00FFFFFF) | 0x99000000));
         FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(px(170), px(170), Gravity.BOTTOM | Gravity.START);
         blp.leftMargin = -px(40);
         blp.bottomMargin = -px(80);
         card.addView(blob, blp);
         View arc = new View(a);
-        arc.setBackground(oval(p.glow));
+        arc.setBackground(oval(0x1AFFFFFF));
         FrameLayout.LayoutParams alp = new FrameLayout.LayoutParams(px(260), px(260), Gravity.BOTTOM | Gravity.END);
         alp.rightMargin = -px(70);
         alp.bottomMargin = -px(150);
@@ -760,14 +807,17 @@ final class StudioHome {
         ilp.rightMargin = px(16);
         ilp.bottomMargin = px(10);
         card.addView(image, ilp);
+        heroArt.add(image);
 
         LinearLayout words = new LinearLayout(a);
         words.setOrientation(LinearLayout.VERTICAL);
+        // White on the app's colour, whatever the palette.
         TextView name = displayText(22);
+        name.setTextColor(Color.WHITE);
         name.setText(app.label);
         name.setSingleLine(true);
         name.setEllipsize(TextUtils.TruncateAt.END);
-        TextView line = text(12, p.text2, body);
+        TextView line = text(12, 0xD9FFFFFF, body);
         line.setText(tagline(app));
         line.setSingleLine(true);
         line.setEllipsize(TextUtils.TruncateAt.END);
@@ -782,15 +832,36 @@ final class StudioHome {
 
         View ring = new View(a);
         ring.setBackground(rounded(Color.TRANSPARENT, 18, p.accent, 3));
-        ring.setVisibility(View.INVISIBLE);
+        ring.setAlpha(0f);
         card.addView(ring, match());
-        focusable(card, 1.04f, hasFocus -> ring.setVisibility(hasFocus ? View.VISIBLE : View.INVISIBLE));
+        // Apple TV-style: the card rises with a glow of the theme's accent under it, its ring fades in, and the
+        // artwork on every card drifts a little with the focus (heroParallax).
+        focusable(card, 1.05f, 14, StudioMotion.HERO_IN, hasFocus -> {
+            ring.animate().alpha(hasFocus ? 1f : 0f).setDuration(hasFocus ? StudioMotion.HERO_IN : StudioMotion.FOCUS_OUT)
+                    .setInterpolator(StudioMotion.EASE).start();
+            if (hasFocus) heroParallax(heroes.indexOf(card));
+            else main.post(() -> { if (!heroes.contains(a.getCurrentFocus())) heroParallax(-1); });
+        });
         card.setOnClickListener(v -> launch(app));
         card.setOnLongClickListener(v -> {
             showHeroPicker(slot, v);
             return true;
         });
         return card;
+    }
+
+    /**
+     * The hero row's parallax, without sensors: the focused card's artwork comes forward a touch, and the others
+     * lean away from it, so moving along the row shifts the artwork at its own pace. -1 settles them all.
+     */
+    private void heroParallax(int focus) {
+        for (int j = 0; j < heroArt.size(); j++) {
+            View art = heroArt.get(j);
+            float shift = focus < 0 || j == focus ? 0f : Math.signum(j - focus) * px(6);
+            float scale = j == focus ? 1.06f : 1f;
+            art.animate().translationX(shift).translationY(j == focus ? -px(2) : 0f).scaleX(scale).scaleY(scale)
+                    .setDuration(StudioMotion.HERO_IN).setInterpolator(StudioMotion.EASE).start();
+        }
     }
 
     private View appCard(App app) {
@@ -818,10 +889,9 @@ final class StudioHome {
         card.setOrientation(LinearLayout.HORIZONTAL);
         card.setGravity(Gravity.CENTER_VERTICAL);
         card.setPadding(px(10), 0, px(10), 0);
-        // Noirly's .surface-flat at r-md; focused, the raised surface with the gold ring.
-        Drawable normal = rounded(NoirlyPalette.alpha(p.surface, 0.9f), 12, p.hairlineStrong);
-        Drawable lit = rounded(p.surface2, 12, p.accent, 2);
-        card.setBackground(normal);
+        // Glass at r-md; focused, brighter glass with the accent ring, cross-faded rather than swapped.
+        TransitionDrawable glass = fader(glass(12, false), glass(12, true));
+        card.setBackground(glass);
         ImageView image = new ImageView(a);
         image.setImageBitmap(icon);
         card.addView(image, new LinearLayout.LayoutParams(px(40), px(40)));
@@ -831,7 +901,7 @@ final class StudioHome {
         name.setText(title);
         name.setSingleLine(true);
         name.setEllipsize(TextUtils.TruncateAt.END);
-        TextView kind = text(13, p.text2, body);   // Hanken, as the subtitle under the greeting
+        TextView kind = text(11, p.text2, body);   // Hanken, as the subtitle under the greeting, a step below the title
         kind.setText(subtitle);
         kind.setSingleLine(true);
         words.addView(name);
@@ -839,7 +909,7 @@ final class StudioHome {
         LinearLayout.LayoutParams wlp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
         wlp.leftMargin = px(12);
         card.addView(words, wlp);
-        focusable(card, 1.03f, hasFocus -> card.setBackground(hasFocus ? lit : normal));
+        focusable(card, 1.04f, hasFocus -> fade(glass, hasFocus));
         card.setOnClickListener(v -> action.run());
         return card;
     }
@@ -852,14 +922,32 @@ final class StudioHome {
         item.addView(image, new FrameLayout.LayoutParams(px(44), px(44), Gravity.CENTER));
         View ring = new View(a);
         ring.setBackground(oval(Color.TRANSPARENT, p.accent, 3));
-        ring.setVisibility(View.INVISIBLE);
+        ring.setAlpha(0f);
         item.addView(ring, new FrameLayout.LayoutParams(px(50), px(50), Gravity.CENTER));
         item.setContentDescription(app.label);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(px(54), px(54));
         lp.leftMargin = px(3);
         lp.rightMargin = px(3);
         item.setLayoutParams(lp);
-        focusable(item, 1.15f, hasFocus -> ring.setVisibility(hasFocus ? View.VISIBLE : View.INVISIBLE));
+        // The icon's round outline casts the accent glow; the bar itself never moves or resizes.
+        int inset = px(5);
+        item.setOutlineProvider(new android.view.ViewOutlineProvider() {
+            @Override
+            public void getOutline(View v, android.graphics.Outline o) {
+                o.setOval(inset, inset, v.getWidth() - inset, v.getHeight() - inset);
+            }
+        });
+        StudioMotion.glow(item, p.accent);
+        StudioMotion.Spring spring = new StudioMotion.Spring(item);
+        item.setFocusable(true);
+        item.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) focused = v;
+            ring.animate().alpha(hasFocus ? 1f : 0f).setDuration(hasFocus ? StudioMotion.DOCK : StudioMotion.FOCUS_OUT)
+                    .setInterpolator(StudioMotion.EASE).start();
+            v.setElevation(hasFocus ? px(4) : 0);
+            v.animate().translationZ(hasFocus ? px(8) : 0).setDuration(StudioMotion.DOCK).start();
+            spring.to(hasFocus ? 1.15f : 1f, motion);
+        });
         item.setOnClickListener(v -> launch(app));
         return item;
     }
@@ -870,10 +958,12 @@ final class StudioHome {
         box.setGravity(Gravity.CENTER_HORIZONTAL);
         box.setClipChildren(false);
         FrameLayout circle = new FrameLayout(a);
-        // Noirly's .btn-icon: a thin outline on the surface; focused, the gold fill with accent-ink.
-        Drawable normal = oval(p.surface, p.hairlineStrong, 1);
-        Drawable lit = oval(p.accent);
-        circle.setBackground(normal);
+        // Noirly's .btn-icon: a thin outline on the surface; focused, the accent fill with accent-ink, eased.
+        GradientDrawable disc = new GradientDrawable();
+        disc.setShape(GradientDrawable.OVAL);
+        circle.setBackground(disc);
+        circle.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
+        StudioMotion.glow(circle, p.accent);
         ImageView icon = new ImageView(a);
         Drawable d = a.getDrawable(iconRes);
         if (d != null) d = d.mutate();
@@ -894,10 +984,19 @@ final class StudioHome {
         final Drawable icn = d;
         lastIcon = d;
         lastLabel = name;
-        focusable(box, 1.08f, hasFocus -> {
-            circle.setBackground(hasFocus ? lit : normal);
-            if (icn != null) icn.setTint(hasFocus ? p.accentInk : icn == wifiIcon ? wifiColor : p.text);
-            name.setTextColor(hasFocus ? p.accent : p.text2);
+        StudioMotion.Colors look = new StudioMotion.Colors(c -> {
+            disc.setColor(c[0]);
+            disc.setStroke(px(1), c[1]);
+            if (icn != null) icn.setTint(c[2]);
+            name.setTextColor(c[3]);
+        }, p.surface, p.hairlineStrong, p.text, p.text2);
+        focusable(box, 1.08f, 0, StudioMotion.FOCUS_IN, hasFocus -> {
+            // At rest the Wi-Fi icon keeps its status colour (showNet).
+            int rest = icn != null && icn == wifiIcon ? wifiColor : p.text;
+            look.to(hasFocus ? StudioMotion.FOCUS_IN : StudioMotion.FOCUS_OUT, hasFocus ? p.accent : p.surface,
+                    hasFocus ? p.accent : p.hairlineStrong, hasFocus ? p.accentInk : rest, hasFocus ? p.accent : p.text2);
+            circle.animate().translationZ(hasFocus ? px(8) : 0).setDuration(StudioMotion.FOCUS_IN)
+                    .setInterpolator(StudioMotion.EASE).start();
         });
         box.setOnClickListener(v -> action.run());
         top.add(box);
@@ -923,7 +1022,6 @@ final class StudioHome {
         }
         wifiLabel.setText(ssid != null ? ssid : nc == null ? "Offline" : "Wi-Fi");
         wifiLabel.setSingleLine(true);
-        wifiLabel.setAllCaps(true);   // setSingleLine drops the caps transform the other labels keep
         wifiLabel.setEllipsize(TextUtils.TruncateAt.END);
         wifiLabel.setMaxWidth(px(w));
         b.getLayoutParams().width = ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -943,13 +1041,35 @@ final class StudioHome {
     private interface FocusChange { void on(boolean hasFocus); }
 
     private void focusable(View v, float scale, FocusChange change) {
+        focusable(v, scale, 6, StudioMotion.FOCUS_IN, change);
+    }
+
+    /**
+     * Focus zooms the view to scale and lifts it by liftDp, casting the theme's accent glow where its outline is
+     * solid; the old zoom is retargeted, never queued. The focused view is raised at once, so it draws over its
+     * neighbours while it grows.
+     */
+    private void focusable(View v, float scale, float liftDp, int inMs, FocusChange change) {
         v.setFocusable(true);
+        StudioMotion.glow(v, p.accent);
         v.setOnFocusChangeListener((view, hasFocus) -> {
             if (hasFocus) focused = view;
             change.on(hasFocus);
-            view.animate().scaleX(hasFocus ? scale : 1f).scaleY(hasFocus ? scale : 1f).setDuration(120).start();
-            view.setZ(hasFocus ? px(4) : 0);
+            view.setElevation(hasFocus ? px(4) : 0);
+            StudioMotion.zoom(view, hasFocus, scale, px(liftDp), inMs);
         });
+    }
+
+    /** Two backgrounds that cross-fade, for focus. */
+    private static TransitionDrawable fader(Drawable rest, Drawable lit) {
+        TransitionDrawable t = new TransitionDrawable(new Drawable[]{rest, lit});
+        t.setCrossFadeEnabled(true);
+        return t;
+    }
+
+    private static void fade(TransitionDrawable t, boolean lit) {
+        if (lit) t.startTransition(StudioMotion.FOCUS_IN);
+        else t.reverseTransition(StudioMotion.FOCUS_OUT);
     }
 
     // ---- keys ----
@@ -1137,12 +1257,14 @@ final class StudioHome {
             return;
         }
         View anchor = top.get(0);
+        StudioMotion.popup(popup);
         popup.showAsDropDown(anchor, -px(64), px(8));
+        if (motion) StudioMotion.drop(rows, px(6));
         rows.getChildAt(1).requestFocus();
     }
 
     private View inputRow(String label, Runnable action) {
-        // JetBrains Mono capitals, like the tabs and button labels; quiet at rest, the accent pill on focus.
+        // Inter, like the tabs and button labels; quiet at rest, the accent pill on focus.
         TextView row = label(12, p.text2);
         row.setText(label);
         row.setPadding(px(14), px(11), px(14), px(11));
@@ -1246,6 +1368,7 @@ final class StudioHome {
         if (id.equals(p.id) && dark == p.dark) return;
         a.getSharedPreferences(THEME_PREFS, Context.MODE_PRIVATE).edit()
                 .putString("palette", id).putBoolean("dark", dark).apply();
+        themeSwitch = true;
         a.recreate();
     }
 
@@ -1515,7 +1638,33 @@ final class StudioHome {
         return Color.HSVToColor(hsv);
     }
 
+    /** The colour made brighter (factor above 1) or darker (below 1). */
+    private static int shade(int color, float factor) {
+        float[] hsv = new float[3];
+        Color.colorToHSV(color, hsv);
+        hsv[2] = Math.min(1f, hsv[2] * factor);
+        return Color.HSVToColor(hsv);
+    }
+
     // ---- small builders ----
+
+    /**
+     * Frosted glass without blur (the launcher draws none, for 1 GB TVs): a see-through white tint that fades
+     * from the top left, a sheen across the top and a bright hairline edge. Lit, it brightens and takes the
+     * accent ring.
+     */
+    private Drawable glass(float radiusDp, boolean lit) {
+        int top = p.dark ? (lit ? 0x38FFFFFF : 0x24FFFFFF) : (lit ? 0xE6FFFFFF : 0xB3FFFFFF);
+        int bottom = p.dark ? (lit ? 0x14FFFFFF : 0x08FFFFFF) : (lit ? 0xA6FFFFFF : 0x66FFFFFF);
+        GradientDrawable tint = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{top, bottom});
+        tint.setCornerRadius(px(radiusDp));
+        if (lit) tint.setStroke(px(2), p.accent);
+        else tint.setStroke(px(1), p.dark ? 0x33FFFFFF : 0xE6FFFFFF);
+        GradientDrawable sheen = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{p.dark ? 0x1AFFFFFF : 0x66FFFFFF, Color.TRANSPARENT, Color.TRANSPARENT});
+        sheen.setCornerRadius(px(radiusDp));
+        return new android.graphics.drawable.LayerDrawable(new Drawable[]{tint, sheen});
+    }
 
     private int px(float dps) { return Math.round(dps * dp); }
 
@@ -1525,28 +1674,16 @@ final class StudioHome {
         return t;
     }
 
-    /** Fraunces, tight: titles, the greeting and the figures. */
+    /** Inter Display, tight: titles, the greeting and the figures. */
     private TextView displayText(float sp) {
         TextView t = text(sp, p.text, display);
         t.setLetterSpacing(DISPLAY_TRACKING);
         return t;
     }
 
-    /** JetBrains Mono in capitals, spaced out: Noirly's .mono-label for categories, tabs and small labels. */
+    /** Inter Display, as written: categories, tabs and small labels. */
     private TextView label(float sp, int color) {
-        TextView t = text(sp, color, mono);
-        t.setLetterSpacing(LABEL_TRACKING);
-        t.setAllCaps(true);
-        return t;
-    }
-
-    /** Noirly's .surface: the surface with the faint top-lit card gradient and a hairline edge. */
-    private Drawable card(float radiusDp, int stroke) {
-        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{p.cardTop, p.cardBottom});
-        g.setCornerRadius(px(radiusDp));
-        g.setStroke(px(1), stroke);
-        return g;
+        return text(sp, color, display);
     }
 
     private static void style(TextView t, float sp, int color, Typeface face) {
