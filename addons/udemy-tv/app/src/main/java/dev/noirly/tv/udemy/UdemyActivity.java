@@ -156,12 +156,18 @@ public final class UdemyActivity extends Activity {
             }
             return true;
         }
-        // Play/pause keys and, in fullscreen, OK: the player's own Space.
+        // Play/pause keys and, in fullscreen, OK: the player's play button, or its own Space where there is none.
+        // Space alone goes to whatever control has focus, the seek bar after an arrow, and is lost there.
         if (code == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || code == KeyEvent.KEYCODE_MEDIA_PLAY
                 || code == KeyEvent.KEYCODE_MEDIA_PAUSE
                 || (fullscreen != null && (code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER))) {
-            return super.dispatchKeyEvent(new KeyEvent(e.getDownTime(), e.getEventTime(), e.getAction(),
-                    KeyEvent.KEYCODE_SPACE, e.getRepeatCount()));
+            if (down && e.getRepeatCount() == 0) web.evaluateJavascript(PLAY_PAUSE, pressed -> {
+                if ("true".equals(pressed)) return;
+                long now = SystemClock.uptimeMillis();
+                super.dispatchKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SPACE, 0));
+                super.dispatchKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SPACE, 0));
+            });
+            return true;
         }
         // Fullscreen video: the arrows go to the player (seek and volume), as on a computer.
         if (fullscreen != null) return super.dispatchKeyEvent(e);
@@ -210,11 +216,62 @@ public final class UdemyActivity extends Activity {
     private void touch(int action) {
         long now = SystemClock.uptimeMillis();
         if (action == MotionEvent.ACTION_DOWN) downAt = now;
+        if (action == MotionEvent.ACTION_DOWN) web.evaluateJavascript(CLICK_WATCH, null);
         MotionEvent ev = MotionEvent.obtain(downAt, now, action, pointer.x, pointer.y, 0);
         ev.setSource(InputDevice.SOURCE_TOUCHSCREEN);
         web.dispatchTouchEvent(ev);
         ev.recycle();
-        if (action == MotionEvent.ACTION_UP) main.postDelayed(this::keyboardIfTyping, 250);
+        if (action == MotionEvent.ACTION_UP) {
+            main.postDelayed(this::clickIfSwallowed, 300);
+            main.postDelayed(this::keyboardIfTyping, 250);
+        }
+    }
+
+    /** Presses the player's play/pause button, after showing its controls (a hidden one ignores the press). */
+    private static final String PLAY_PAUSE = "(function(){var b=document.querySelector('.shaka-small-play-button');"
+            + "if(!b)return false;var c=b.closest('.shaka-controls-container');if(c)c.dispatchEvent(new MouseEvent("
+            + "'mousemove',{bubbles:true}));b.click();return true;})()";
+
+    /**
+     * Notes when the page last saw a real tap (and what it landed on), click and play/pause, so clickIfSwallowed
+     * knows whether the tap did anything. Times, not flags reset at OK down: this script may run after the tap.
+     * The target is taken from the tap itself: the player closes an open menu (the captions languages) on the tap,
+     * and by then the pointer is over the video instead.
+     */
+    private static final String CLICK_WATCH = "window.__tvClick||(window.__tvClick=window.__tvDown="
+            + "window.__tvToggled=-1e9,['click','play','pause','pointerdown'].forEach(function(n){"
+            + "window.addEventListener(n,function(e){if(!e.isTrusted)return;var t=performance.now();"
+            + "if(n==='click')window.__tvClick=t;else if(n==='pointerdown'){window.__tvDown=t;"
+            + "window.__tvTarget=e.target;}else window.__tvToggled=t;},true);}));";
+
+    /**
+     * Udemy's player (Shaka) cancels the touchend of a tap, so the tap never becomes a click and its buttons and
+     * seek bar ignore OK. When the tap landed in the player and no click followed, click it from the page instead:
+     * on the video it plays or pauses, another button gets a mouse click once the controls
+     * show, a slider (seek, volume) jumps to the pointer. The tap still counts as the user's gesture, so the
+     * fullscreen button works too.
+     */
+    private void clickIfSwallowed() {
+        web.evaluateJavascript("(function(X,Y){X=X*innerWidth/" + web.getWidth() + ";Y=Y*innerHeight/"
+                + web.getHeight() + ";var n=performance.now();if(n-window.__tvClick<400)return;"
+                + "var e=n-window.__tvDown<1000&&window.__tvTarget;"
+                + "if(!e||!e.isConnected)e=document.elementFromPoint(X,Y);"
+                + "var c=e&&e.closest('.shaka-controls-container');if(!c)return;"
+                // The touch player hides its controls while playing, and a tap on them only shows them again.
+                + "c.dispatchEvent(new MouseEvent('mousemove',{bubbles:true,clientX:X,clientY:Y}));"
+                // On the video (its big play button, or the loading spinner over it): press the bar's play button,
+                // the one that always toggles. The video's own play() or pause() is undone by Udemy's player.
+                + "if(e.closest('.shaka-play-button')||!e.closest('button,input')){if(n-window.__tvToggled<1000)return;"
+                + "e=c.querySelector('.shaka-small-play-button');if(!e)return;}"
+                + "var r=e.closest('input[type=range]');if(r){var b=r.getBoundingClientRect(),mn=+r.min||0,"
+                + "mx=r.max===''?100:+r.max;r.value=mn+Math.max(0,Math.min(1,(X-b.left)/b.width))*(mx-mn);"
+                + "r.dispatchEvent(new Event('input',{bubbles:true}));"
+                + "r.dispatchEvent(new Event('change',{bubbles:true}));return;}"
+                + "var o={bubbles:true,cancelable:true,composed:true,clientX:X,clientY:Y,button:0,view:window};"
+                + "[['pointerdown',1],['mousedown',1],['pointerup',0],['mouseup',0]].forEach(function(t){"
+                + "e.dispatchEvent(new (t[0][0]=='p'?PointerEvent:MouseEvent)(t[0],"
+                + "Object.assign({pointerType:'mouse',buttons:t[1]},o)));});"
+                + "e.dispatchEvent(new MouseEvent('click',o));})(" + pointer.x + "," + pointer.y + ")", null);
     }
 
     /** A synthesised tap focuses a field but does not raise the keyboard on a TV; ask the page and raise it. */
