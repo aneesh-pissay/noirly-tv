@@ -215,17 +215,26 @@ public final class UdemyActivity extends Activity {
     /** A tap at the pointer: OK down presses, OK up releases, so a held OK is a long press. */
     private void touch(int action) {
         long now = SystemClock.uptimeMillis();
-        if (action == MotionEvent.ACTION_DOWN) downAt = now;
-        if (action == MotionEvent.ACTION_DOWN) web.evaluateJavascript(CLICK_WATCH, null);
+        if (action == MotionEvent.ACTION_DOWN) {
+            downAt = now;
+            // A new tap drops the last one's pending fallback, which would act on this tap's target instead.
+            main.removeCallbacks(pendingClick);
+            web.evaluateJavascript(CLICK_WATCH, null);
+        }
         MotionEvent ev = MotionEvent.obtain(downAt, now, action, pointer.x, pointer.y, 0);
         ev.setSource(InputDevice.SOURCE_TOUCHSCREEN);
         web.dispatchTouchEvent(ev);
         ev.recycle();
         if (action == MotionEvent.ACTION_UP) {
-            main.postDelayed(this::clickIfSwallowed, 300);
+            float x = pointer.x, y = pointer.y;
+            pendingClick = () -> clickIfSwallowed(x, y);
+            main.postDelayed(pendingClick, 300);
             main.postDelayed(this::keyboardIfTyping, 250);
         }
     }
+
+    /** The last tap's clickIfSwallowed, at the pointer where that tap was. */
+    private Runnable pendingClick = () -> { };
 
     /** Presses the player's play/pause button, after showing its controls (a hidden one ignores the press). */
     private static final String PLAY_PAUSE = "(function(){var b=document.querySelector('.shaka-small-play-button');"
@@ -251,12 +260,14 @@ public final class UdemyActivity extends Activity {
      * show, a slider (seek, volume) jumps to the pointer. The tap still counts as the user's gesture, so the
      * fullscreen button works too.
      */
-    private void clickIfSwallowed() {
+    private void clickIfSwallowed(float x, float y) {
         web.evaluateJavascript("(function(X,Y){X=X*innerWidth/" + web.getWidth() + ";Y=Y*innerHeight/"
                 + web.getHeight() + ";var n=performance.now();if(n-window.__tvClick<400)return;"
                 + "var e=n-window.__tvDown<1000&&window.__tvTarget;"
                 + "if(!e||!e.isConnected)e=document.elementFromPoint(X,Y);"
-                + "var c=e&&e.closest('.shaka-controls-container');if(!c)return;"
+                // The video and the loading spinner sit beside the controls, in the same video container.
+                + "var c=e&&e.closest('.shaka-controls-container');if(!c&&e){var w=e.closest('.shaka-video-container');"
+                + "c=w&&w.querySelector('.shaka-controls-container');}if(!c)return;"
                 // The touch player hides its controls while playing, and a tap on them only shows them again.
                 + "c.dispatchEvent(new MouseEvent('mousemove',{bubbles:true,clientX:X,clientY:Y}));"
                 // On the video (its big play button, or the loading spinner over it): press the bar's play button,
@@ -271,7 +282,7 @@ public final class UdemyActivity extends Activity {
                 + "[['pointerdown',1],['mousedown',1],['pointerup',0],['mouseup',0]].forEach(function(t){"
                 + "e.dispatchEvent(new (t[0][0]=='p'?PointerEvent:MouseEvent)(t[0],"
                 + "Object.assign({pointerType:'mouse',buttons:t[1]},o)));});"
-                + "e.dispatchEvent(new MouseEvent('click',o));})(" + pointer.x + "," + pointer.y + ")", null);
+                + "e.dispatchEvent(new MouseEvent('click',o));})(" + x + "," + y + ")", null);
     }
 
     /** A synthesised tap focuses a field but does not raise the keyboard on a TV; ask the page and raise it. */
