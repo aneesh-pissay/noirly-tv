@@ -450,6 +450,7 @@ final class StudioHome {
 
     void onPause() {
         paused = true;
+        dismissAppMenu();
         try {
             a.getSystemService(ConnectivityManager.class).unregisterNetworkCallback(net);
         } catch (RuntimeException ignored) {
@@ -460,6 +461,7 @@ final class StudioHome {
 
     /** Home pressed while Home is showing: back to the first hero card, the grid scrolled to the top. */
     void onHome() {
+        dismissAppMenu();
         gridScroll.scrollTo(0, 0);
         dockScroll.scrollTo(0, 0);
         focusFirst();
@@ -963,6 +965,14 @@ final class StudioHome {
         });
     }
 
+    /** The app menu while it is open: Home and leaving Home close it, or it would keep the next D-pad press. */
+    private PopupWindow appMenu;
+
+    private void dismissAppMenu() {
+        if (appMenu != null && appMenu.isShowing()) appMenu.dismiss();
+        appMenu = null;
+    }
+
     /** A small glass list under the app, like the Inputs one; App info only where the firmware has the page. */
     private void showAppMenu(App app, View anchor) {
         LinearLayout rows = new LinearLayout(a);
@@ -971,6 +981,8 @@ final class StudioHome {
         rows.setBackground(rounded(p.surface, 14, p.hairlineStrong));
         PopupWindow popup = new PopupWindow(rows, px(190), ViewGroup.LayoutParams.WRAP_CONTENT, true);
         popup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
+        dismissAppMenu();
+        appMenu = popup;
         rows.addView(popupHeading(app.label));
         rows.addView(inputRow(a.getString(R.string.library_open), () -> { popup.dismiss(); launch(app); }));
         Intent info = SystemSettings.appInfo(a, app.info.activityInfo.packageName);

@@ -54,7 +54,9 @@ final class NoirlyPalette {
         if (dark) {
             bgDeep = Color.BLACK;
             surface2 = mix(surface, text, 0.12f);
-            text2 = alpha(text, 0.68f);
+            // 0.85, not the web's 0.68: over the brighter accent wash at the top (the greeting's subtitle) a light
+            // accent (gold, forest, teal) otherwise leaves it under 4.5:1.
+            text2 = alpha(text, 0.85f);
             muted = alpha(text, 0.49f);
             hairline = alpha(text, 0.09f);
             glow = alpha(text, 0.08f);
@@ -65,12 +67,12 @@ final class NoirlyPalette {
             // own colour rather than near-black; the wash only lightens and darkens it.
             page = deep(accent, 0.66f, 0.27f);
             beam = alpha(accent, 0.18f);
-            blobAccent = alpha(accent, 0.3f);
+            blobAccent = alpha(accent, 0.2f);
             blobAccentSoft = alpha(accent, 0.16f);
             blobNeutral = alpha(deep(accent, 0.6f, 0.4f), 0.35f);
             gridLine = alpha(text, 0.035f);
             vignette = alpha(bgDeep, 0.4f);
-            washTop = deep(accent, 0.62f, 0.4f);
+            washTop = deep(accent, 0.62f, 0.3f);
             washBottom = deep(accent, 0.72f, 0.13f);
             grain = 0.02f;
         } else {
