@@ -61,16 +61,17 @@ final class NoirlyPalette {
             accentSoft = alpha(accent, 0.14f);
             cardTop = mix(surface, text, 0.07f);
             cardBottom = mix(surface, text, 0.02f);
-            // A deep, clean colour in the accent's hue (no grey mixed in); the wash only lightens and darkens it.
-            page = tone(accent, 0.5f, 0.17f);
-            beam = alpha(accent, 0.12f);
-            blobAccent = alpha(accent, 0.18f);
-            blobAccentSoft = alpha(accent, 0.1f);
-            blobNeutral = alpha(tone(accent, 0.45f, 0.3f), 0.35f);
+            // A rich, clean colour in the accent's hue (no grey mixed in), bright enough to read as the theme's
+            // own colour rather than near-black; the wash only lightens and darkens it.
+            page = deep(accent, 0.66f, 0.27f);
+            beam = alpha(accent, 0.18f);
+            blobAccent = alpha(accent, 0.3f);
+            blobAccentSoft = alpha(accent, 0.16f);
+            blobNeutral = alpha(deep(accent, 0.6f, 0.4f), 0.35f);
             gridLine = alpha(text, 0.035f);
             vignette = alpha(bgDeep, 0.4f);
-            washTop = tone(accent, 0.45f, 0.24f);
-            washBottom = tone(accent, 0.55f, 0.09f);
+            washTop = deep(accent, 0.62f, 0.4f);
+            washBottom = deep(accent, 0.72f, 0.13f);
             grain = 0.02f;
         } else {
             bgDeep = mix(bg, text, 0.12f);
@@ -82,16 +83,17 @@ final class NoirlyPalette {
             accentSoft = alpha(accent, 0.1f);
             cardTop = mix(surface, Color.WHITE, 0.9f);
             cardBottom = mix(surface, bg, 0.28f);
-            // A soft, clean tint of the accent's hue (no grey mixed in), deep enough for the white glass to show.
-            page = tone(accent, 0.14f, 0.88f);
-            beam = alpha(accent, 0.1f);
-            blobAccent = alpha(accent, 0.14f);
-            blobAccentSoft = alpha(accent, 0.09f);
+            // A bright, clean pastel of the accent's hue (no grey mixed in), tinted enough for the white glass to
+            // show against it.
+            page = tone(accent, 0.17f, 0.975f);
+            beam = alpha(accent, 0.12f);
+            blobAccent = alpha(accent, 0.2f);
+            blobAccentSoft = alpha(accent, 0.12f);
             blobNeutral = alpha(Color.WHITE, 0.35f);
             gridLine = alpha(text, 0.035f);
-            vignette = alpha(tone(accent, 0.35f, 0.45f), 0.16f);
-            washTop = tone(accent, 0.08f, 0.95f);
-            washBottom = tone(accent, 0.2f, 0.8f);
+            vignette = alpha(tone(accent, 0.35f, 0.6f), 0.12f);
+            washTop = tone(accent, 0.08f, 1f);
+            washBottom = tone(accent, 0.27f, 0.92f);
             grain = 0.02f;
         }
         hairlineStrong = alpha(text, 0.18f);
@@ -120,6 +122,19 @@ final class NoirlyPalette {
     static int tone(int c, float saturation, float value) {
         float[] hsv = new float[3];
         Color.colorToHSV(c, hsv);
+        hsv[1] = saturation;
+        hsv[2] = value;
+        return Color.HSVToColor(hsv);
+    }
+
+    /**
+     * tone() for the dark page. A deep yellow reads as olive, so a yellow hue (Warm Gold's) leans 14 degrees
+     * towards amber there and the page reads as gold; every other hue is kept as it is.
+     */
+    static int deep(int c, float saturation, float value) {
+        float[] hsv = new float[3];
+        Color.colorToHSV(c, hsv);
+        if (hsv[0] >= 40f && hsv[0] <= 70f) hsv[0] -= 14f;
         hsv[1] = saturation;
         hsv[2] = value;
         return Color.HSVToColor(hsv);
