@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The TV banner: a globe in Noirly's warm gold on near-black, drawn for this add-on. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp" android:height="180dp"
+    android:viewportWidth="320" android:viewportHeight="180">
+    <path android:fillColor="#FF0A0A08" android:pathData="M0,0h320v180h-320z" />
+    <path android:strokeColor="#FFFFE66D" android:strokeWidth="6" android:fillColor="#00000000"
+        android:pathData="M160,40a50,50 0,1 1,0 100a50,50 0,1 1,0 -100z" />
+    <path android:strokeColor="#FFFFE66D" android:strokeWidth="5" android:fillColor="#00000000"
+        android:pathData="M160,40c-30,28 -30,72 0,100c30,-28 30,-72 0,-100z" />
+    <path android:strokeColor="#FFF5F3EA" android:strokeWidth="5" android:fillColor="#00000000"
+        android:pathData="M112,74h96M112,106h96" />
+</vector>
