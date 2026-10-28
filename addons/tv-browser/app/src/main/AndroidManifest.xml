@@ -7,7 +7,10 @@
     <!-- The web, in a web view. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- usesCleartextTraffic: a browser loads the http:// pages it is given (a router's page, an old site), as
+         Chrome does; Android refuses them otherwise. Nothing of the app's own goes over the network. -->
     <application
+        android:usesCleartextTraffic="true"
         android:allowBackup="false"
         android:banner="@drawable/banner"
         android:icon="@drawable/icon"

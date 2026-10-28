@@ -172,7 +172,8 @@ public final class BrowserActivity extends Activity {
         // A link handed in (another app's, or adb: am start -d https://...) wins over the page left last time.
         Uri asked = getIntent().getData();
         String last = prefs.getString("last", HOME);
-        if (asked != null && isWeb(asked)) web.loadUrl(asked.toString());
+        // Only on a fresh start: a recreate (state kept) goes back to the page left, not to the link.
+        if (state == null && asked != null && isWeb(asked)) web.loadUrl(asked.toString());
         else if (last.equals(HOME)) goHome();
         else web.loadUrl(last);
     }
@@ -180,6 +181,7 @@ public final class BrowserActivity extends Activity {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        setIntent(intent);   // getIntent() is this link from now on, not the one the app started with
         Uri asked = intent.getData();
         if (asked != null && isWeb(asked)) web.loadUrl(asked.toString());
     }
@@ -428,9 +430,13 @@ public final class BrowserActivity extends Activity {
      */
     private void touch(int action) {
         long now = SystemClock.uptimeMillis();
-        if (action == MotionEvent.ACTION_DOWN) downAt = now;
         boolean onPage = pointer.y >= web.getTop();
-        if (action == MotionEvent.ACTION_DOWN && onPage) web.evaluateJavascript(CLICK_WATCH, null);
+        if (action == MotionEvent.ACTION_DOWN) {
+            downAt = now;
+            // A new tap drops the last one's pending fallback, which would act on this tap's target instead.
+            main.removeCallbacks(pendingClick);
+            if (onPage) web.evaluateJavascript(CLICK_WATCH, null);
+        }
         MotionEvent ev = MotionEvent.obtain(downAt, now, action, pointer.x, pointer.y, 0);
         ev.setSource(InputDevice.SOURCE_TOUCHSCREEN);
         root.dispatchTouchEvent(ev);
@@ -446,9 +452,14 @@ public final class BrowserActivity extends Activity {
             }, 150);
             return;
         }
-        main.postDelayed(this::clickIfSwallowed, 300);
+        float x = pointer.x - web.getLeft(), y = pointer.y - web.getTop();
+        pendingClick = () -> clickIfSwallowed(x, y);
+        main.postDelayed(pendingClick, 300);
         main.postDelayed(this::keyboardIfTyping, 250);
     }
+
+    /** The last tap's clickIfSwallowed, at the pointer where that tap was (in the web view's coordinates). */
+    private Runnable pendingClick = () -> { };
 
     /** Toggles the page's first video, if it has one. */
     private static final String PLAY_PAUSE = "(function(){var v=document.querySelector('video');if(!v)return false;"
@@ -473,8 +484,7 @@ public final class BrowserActivity extends Activity {
      * page instead: a slider (seek, volume) jumps to the pointer, anything else gets a mouse click. The tap still
      * counts as the user's gesture, so a fullscreen button works too.
      */
-    private void clickIfSwallowed() {
-        float x = pointer.x - web.getLeft(), y = pointer.y - web.getTop();
+    private void clickIfSwallowed(float x, float y) {
         web.evaluateJavascript("(function(X,Y){X=X*innerWidth/" + web.getWidth() + ";Y=Y*innerHeight/"
                 + web.getHeight() + ";var n=performance.now();"
                 + "var e=n-window.__tvDown<1000&&window.__tvTarget;"
@@ -557,6 +567,16 @@ public final class BrowserActivity extends Activity {
         @Override
         public void doUpdateVisitedHistory(WebView view, String url, boolean isReload) {
             showPage(url);
+        }
+
+        /**
+         * A heavy page or protected video can get the page's renderer killed on a 1 GB TV. Unanswered, that takes
+         * the app down with it; instead start over, on the page onPause() kept.
+         */
+        @Override
+        public boolean onRenderProcessGone(WebView view, android.webkit.RenderProcessGoneDetail detail) {
+            recreate();
+            return true;
         }
     }
 

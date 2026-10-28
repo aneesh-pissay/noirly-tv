@@ -3,6 +3,7 @@
 The web with a TV remote. Chrome has no Android TV version, and sites are built for a mouse, so this add-on opens
 them in the TV's own WebView (the Chromium engine Chrome is built on) and gives the remote a pointer. For the
 [Noirly TV](../../README.md) launcher it is also a module card. On any other Android TV home it is an ordinary app.
+Tested on a TCL G09 (Google TV 12).
 
 ![Home: a search box and the pages kept on Home](screenshot.jpg)
 
@@ -44,6 +45,9 @@ code or a password) work.
 | Permission | Why |
 |---|---|
 | `INTERNET` | The web. |
+
+Plain `http://` pages load too (`usesCleartextTraffic`), as in Chrome: a router's settings page or an old site
+has nothing else. What you type without `http://` is opened over HTTPS.
 
 There is nothing else: no analytics and no background service. Cookies, site storage and the pages kept on Home
 stay in the app's private storage (backups off). The camera, the microphone and location are refused to every site.
