@@ -450,6 +450,7 @@ final class StudioHome {
 
     void onPause() {
         paused = true;
+        dismissAppMenu();
         try {
             a.getSystemService(ConnectivityManager.class).unregisterNetworkCallback(net);
         } catch (RuntimeException ignored) {
@@ -460,6 +461,7 @@ final class StudioHome {
 
     /** Home pressed while Home is showing: back to the first hero card, the grid scrolled to the top. */
     void onHome() {
+        dismissAppMenu();
         gridScroll.scrollTo(0, 0);
         dockScroll.scrollTo(0, 0);
         focusFirst();
@@ -865,7 +867,9 @@ final class StudioHome {
     }
 
     private View appCard(App app) {
-        return listCard(app.label, category(app), circleless(icon(app)), () -> launch(app));
+        View card = listCard(app.label, category(app), circleless(icon(app)), () -> launch(app));
+        holdForMenu(card, app);
+        return card;
     }
 
     private View settingsCard() {
@@ -949,7 +953,51 @@ final class StudioHome {
             spring.to(hasFocus ? 1.15f : 1f, motion);
         });
         item.setOnClickListener(v -> launch(app));
+        holdForMenu(item, app);
         return item;
+    }
+
+    /** Holding OK on an app: Open and App info, where the TV's own page also uninstalls what can be. */
+    private void holdForMenu(View v, App app) {
+        v.setOnLongClickListener(view -> {
+            showAppMenu(app, view);
+            return true;
+        });
+    }
+
+    /** The app menu while it is open: Home and leaving Home close it, or it would keep the next D-pad press. */
+    private PopupWindow appMenu;
+
+    private void dismissAppMenu() {
+        if (appMenu != null && appMenu.isShowing()) appMenu.dismiss();
+        appMenu = null;
+    }
+
+    /** A small glass list under the app, like the Inputs one; App info only where the firmware has the page. */
+    private void showAppMenu(App app, View anchor) {
+        LinearLayout rows = new LinearLayout(a);
+        rows.setOrientation(LinearLayout.VERTICAL);
+        rows.setPadding(px(6), px(10), px(6), px(6));
+        rows.setBackground(rounded(p.surface, 14, p.hairlineStrong));
+        PopupWindow popup = new PopupWindow(rows, px(190), ViewGroup.LayoutParams.WRAP_CONTENT, true);
+        popup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
+        dismissAppMenu();
+        appMenu = popup;
+        rows.addView(popupHeading(app.label));
+        rows.addView(inputRow(a.getString(R.string.library_open), () -> { popup.dismiss(); launch(app); }));
+        Intent info = SystemSettings.appInfo(a, app.info.activityInfo.packageName);
+        if (info != null) {
+            rows.addView(inputRow(a.getString(R.string.library_app_info), () -> { popup.dismiss(); open(info); }));
+        }
+        // Under the app, or above it where the screen ends first: the bottom row of cards and the bar.
+        rows.measure(View.MeasureSpec.makeMeasureSpec(px(190), View.MeasureSpec.EXACTLY), View.MeasureSpec.UNSPECIFIED);
+        int[] at = new int[2];
+        anchor.getLocationOnScreen(at);
+        int below = at[1] + anchor.getHeight() + px(8) + rows.getMeasuredHeight();
+        boolean up = below > root.getHeight();
+        StudioMotion.popup(popup);
+        popup.showAsDropDown(anchor, 0, up ? -anchor.getHeight() - px(8) - rows.getMeasuredHeight() : px(8));
+        rows.getChildAt(1).requestFocus();
     }
 
     private View roundButton(int iconRes, String label, Runnable action) {

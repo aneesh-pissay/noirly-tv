@@ -54,5 +54,9 @@ TV_HOST=<tv ip> ../../tools/venv/bin/python -I ../../tools/tv.py --push app/buil
 TV_HOST=<tv ip> ../../tools/venv/bin/python -I ../../tools/tv.py 'pm install -r /data/local/tmp/addon.apk; rm -f /data/local/tmp/addon.apk'
 ```
 
+On Windows in Git Bash, run `export MSYS_NO_PATHCONV=1` first, and use `../../tools/venv/Scripts/python.exe`.
+Otherwise Git Bash turns `/data/local/tmp/addon.apk` into a Windows path, the push fails with
+`secure_mkdirs failed: No such file or directory`, and `pm install` finds no file.
+
 The release build is signed with the debug key so it installs over ADB. No libraries: plain Android WebView, about
 15 KB.
