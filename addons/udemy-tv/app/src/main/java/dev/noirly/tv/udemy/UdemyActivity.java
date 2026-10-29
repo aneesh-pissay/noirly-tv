@@ -217,8 +217,6 @@ public final class UdemyActivity extends Activity {
         long now = SystemClock.uptimeMillis();
         if (action == MotionEvent.ACTION_DOWN) {
             downAt = now;
-            // A new tap drops the last one's pending fallback, which would act on this tap's target instead.
-            main.removeCallbacks(pendingClick);
             web.evaluateJavascript(CLICK_WATCH, null);
         }
         MotionEvent ev = MotionEvent.obtain(downAt, now, action, pointer.x, pointer.y, 0);
@@ -226,15 +224,13 @@ public final class UdemyActivity extends Activity {
         web.dispatchTouchEvent(ev);
         ev.recycle();
         if (action == MotionEvent.ACTION_UP) {
+            // Each tap keeps its own fallback, with where the pointer was and when OK went down.
             float x = pointer.x, y = pointer.y;
-            pendingClick = () -> clickIfSwallowed(x, y);
-            main.postDelayed(pendingClick, 300);
+            long down = downAt;
+            main.postDelayed(() -> clickIfSwallowed(x, y, down), 300);
             main.postDelayed(this::keyboardIfTyping, 250);
         }
     }
-
-    /** The last tap's clickIfSwallowed, at the pointer where that tap was. */
-    private Runnable pendingClick = () -> { };
 
     /** Presses the player's play/pause button, after showing its controls (a hidden one ignores the press). */
     private static final String PLAY_PAUSE = "(function(){var b=document.querySelector('.shaka-small-play-button');"
@@ -242,16 +238,20 @@ public final class UdemyActivity extends Activity {
             + "'mousemove',{bubbles:true}));b.click();return true;})()";
 
     /**
-     * Notes when the page last saw a real tap (and what it landed on), click and play/pause, so clickIfSwallowed
-     * knows whether the tap did anything. Times, not flags reset at OK down: this script may run after the tap.
-     * The target is taken from the tap itself: the player closes an open menu (the captions languages) on the tap,
-     * and by then the pointer is over the video instead.
+     * Keeps the page's last few real taps, each with what it landed on and whether a click, a cancelled touchend or
+     * a play/pause followed it, so each tap's clickIfSwallowed knows whether that tap did anything. The target is
+     * taken from the tap itself: the player closes an open menu (the captions languages) on the tap, and by then the
+     * pointer is over the video instead. Installed at the first OK; it may run after that tap.
      */
-    private static final String CLICK_WATCH = "window.__tvClick||(window.__tvClick=window.__tvDown="
-            + "window.__tvToggled=-1e9,['click','play','pause','pointerdown'].forEach(function(n){"
-            + "window.addEventListener(n,function(e){if(!e.isTrusted)return;var t=performance.now();"
-            + "if(n==='click')window.__tvClick=t;else if(n==='pointerdown'){window.__tvDown=t;"
-            + "window.__tvTarget=e.target;}else window.__tvToggled=t;},true);}));";
+    private static final String CLICK_WATCH = "window.__tvTaps||(window.__tvTaps=[],['pointerdown','click','touchend',"
+            + "'play','pause'].forEach(function(n){window.addEventListener(n,function(e){if(!e.isTrusted)return;"
+            + "var T=window.__tvTaps;if(n==='pointerdown'){T.push({t:performance.now(),e:e.target});"
+            + "if(T.length>8)T.shift();return;}var k=T[T.length-1];if(!k)return;if(n==='click')k.click=1;"
+            + "else if(n==='touchend'){if(e.defaultPrevented)k.cancel=1;}else k.toggled=1;},n!=='touchend');}));";
+
+    /** In a fallback's script: k, the page's record of the tap whose OK went down A ms ago, or null. */
+    private static final String TAP_OF = "var k=null,b=250,w=performance.now()-A;(window.__tvTaps||[]).forEach(function(r){"
+            + "var d=Math.abs(r.t-w);if(d<b){b=d;k=r;}});";
 
     /**
      * Udemy's player (Shaka) cancels the touchend of a tap, so the tap never becomes a click and its buttons and
@@ -260,11 +260,10 @@ public final class UdemyActivity extends Activity {
      * show, a slider (seek, volume) jumps to the pointer. The tap still counts as the user's gesture, so the
      * fullscreen button works too.
      */
-    private void clickIfSwallowed(float x, float y) {
-        web.evaluateJavascript("(function(X,Y){X=X*innerWidth/" + web.getWidth() + ";Y=Y*innerHeight/"
-                + web.getHeight() + ";var n=performance.now();if(n-window.__tvClick<400)return;"
-                + "var e=n-window.__tvDown<1000&&window.__tvTarget;"
-                + "if(!e||!e.isConnected)e=document.elementFromPoint(X,Y);"
+    private void clickIfSwallowed(float x, float y, long down) {
+        web.evaluateJavascript("(function(X,Y,A){X=X*innerWidth/" + web.getWidth() + ";Y=Y*innerHeight/"
+                + web.getHeight() + ";" + TAP_OF + "if(k&&k.click)return;"
+                + "var e=k&&k.e;if(!e||!e.isConnected)e=document.elementFromPoint(X,Y);"
                 // The video and the loading spinner sit beside the controls, in the same video container.
                 + "var c=e&&e.closest('.shaka-controls-container');if(!c&&e){var w=e.closest('.shaka-video-container');"
                 + "c=w&&w.querySelector('.shaka-controls-container');}if(!c)return;"
@@ -272,7 +271,7 @@ public final class UdemyActivity extends Activity {
                 + "c.dispatchEvent(new MouseEvent('mousemove',{bubbles:true,clientX:X,clientY:Y}));"
                 // On the video (its big play button, or the loading spinner over it): press the bar's play button,
                 // the one that always toggles. The video's own play() or pause() is undone by Udemy's player.
-                + "if(e.closest('.shaka-play-button')||!e.closest('button,input')){if(n-window.__tvToggled<1000)return;"
+                + "if(e.closest('.shaka-play-button')||!e.closest('button,input')){if(k&&k.toggled)return;"
                 + "e=c.querySelector('.shaka-small-play-button');if(!e)return;}"
                 + "var r=e.closest('input[type=range]');if(r){var b=r.getBoundingClientRect(),mn=+r.min||0,"
                 + "mx=r.max===''?100:+r.max;r.value=mn+Math.max(0,Math.min(1,(X-b.left)/b.width))*(mx-mn);"
@@ -282,7 +281,8 @@ public final class UdemyActivity extends Activity {
                 + "[['pointerdown',1],['mousedown',1],['pointerup',0],['mouseup',0]].forEach(function(t){"
                 + "e.dispatchEvent(new (t[0][0]=='p'?PointerEvent:MouseEvent)(t[0],"
                 + "Object.assign({pointerType:'mouse',buttons:t[1]},o)));});"
-                + "e.dispatchEvent(new MouseEvent('click',o));})(" + x + "," + y + ")", null);
+                + "e.dispatchEvent(new MouseEvent('click',o));})(" + x + "," + y + ","
+                + (SystemClock.uptimeMillis() - down) + ")", null);
     }
 
     /** A synthesised tap focuses a field but does not raise the keyboard on a TV; ask the page and raise it. */

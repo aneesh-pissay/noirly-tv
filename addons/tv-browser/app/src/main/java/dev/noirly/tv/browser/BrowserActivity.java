@@ -191,9 +191,14 @@ public final class BrowserActivity extends Activity {
         super.onPause();
         CookieManager.getInstance().flush();
         String url = web.getUrl();
-        if (url != null && (url.equals(HOME) || url.startsWith("http"))) prefs.edit().putString("last", url).apply();
+        if (!crashed && url != null && (url.equals(HOME) || url.startsWith("http"))) {
+            prefs.edit().putString("last", url).apply();
+        }
         web.onPause();
     }
+
+    /** The page's renderer went down: the page is not kept, and the recreated activity starts on Home. */
+    private boolean crashed;
 
     @Override
     protected void onResume() {
@@ -433,8 +438,6 @@ public final class BrowserActivity extends Activity {
         boolean onPage = pointer.y >= web.getTop();
         if (action == MotionEvent.ACTION_DOWN) {
             downAt = now;
-            // A new tap drops the last one's pending fallback, which would act on this tap's target instead.
-            main.removeCallbacks(pendingClick);
             if (onPage) web.evaluateJavascript(CLICK_WATCH, null);
         }
         MotionEvent ev = MotionEvent.obtain(downAt, now, action, pointer.x, pointer.y, 0);
@@ -452,31 +455,33 @@ public final class BrowserActivity extends Activity {
             }, 150);
             return;
         }
+        // Each tap keeps its own fallback, with where the pointer was (in the web view's coordinates) and when OK
+        // went down.
         float x = pointer.x - web.getLeft(), y = pointer.y - web.getTop();
-        pendingClick = () -> clickIfSwallowed(x, y);
-        main.postDelayed(pendingClick, 300);
+        long down = downAt;
+        main.postDelayed(() -> clickIfSwallowed(x, y, down), 300);
         main.postDelayed(this::keyboardIfTyping, 250);
     }
-
-    /** The last tap's clickIfSwallowed, at the pointer where that tap was (in the web view's coordinates). */
-    private Runnable pendingClick = () -> { };
 
     /** Toggles the page's first video, if it has one. */
     private static final String PLAY_PAUSE = "(function(){var v=document.querySelector('video');if(!v)return false;"
             + "v.paused?v.play():v.pause();return true;})()";
 
     /**
-     * Notes when the page last saw a real tap (and what it landed on), a click, a cancelled touchend and a video
-     * starting or stopping, so
-     * clickIfSwallowed knows whether the tap did anything. Times, not flags reset at OK down: this script may run
-     * after the tap. The target is taken from the tap itself: a page may close an open menu on the tap.
+     * Keeps the page's last few real taps, each with what it landed on and whether a click, a cancelled touchend or
+     * a video starting or stopping followed it, so each tap's clickIfSwallowed knows whether that tap did anything.
+     * The target is taken from the tap itself: a page may close an open menu on the tap. Installed at the first OK
+     * on a page; it may run after that tap.
      */
-    private static final String CLICK_WATCH = "window.__tvClick||(window.__tvClick=window.__tvDown="
-            + "window.__tvCancel=window.__tvToggled=-1e9,['click','pointerdown','touchend','play','pause']"
-            + ".forEach(function(n){window.addEventListener(n,function(e){if(!e.isTrusted)return;"
-            + "var t=performance.now();if(n==='click')window.__tvClick=t;else if(n==='pointerdown'){"
-            + "window.__tvDown=t;window.__tvTarget=e.target;}else if(n==='touchend'){if(e.defaultPrevented)"
-            + "window.__tvCancel=t;}else window.__tvToggled=t;},n!=='touchend');}));";
+    private static final String CLICK_WATCH = "window.__tvTaps||(window.__tvTaps=[],['pointerdown','click','touchend',"
+            + "'play','pause'].forEach(function(n){window.addEventListener(n,function(e){if(!e.isTrusted)return;"
+            + "var T=window.__tvTaps;if(n==='pointerdown'){T.push({t:performance.now(),e:e.target});"
+            + "if(T.length>8)T.shift();return;}var k=T[T.length-1];if(!k)return;if(n==='click')k.click=1;"
+            + "else if(n==='touchend'){if(e.defaultPrevented)k.cancel=1;}else k.toggled=1;},n!=='touchend');}));";
+
+    /** In a fallback's script: k, the page's record of the tap whose OK went down A ms ago, or null. */
+    private static final String TAP_OF = "var k=null,b=250,w=performance.now()-A;(window.__tvTaps||[]).forEach("
+            + "function(r){var d=Math.abs(r.t-w);if(d<b){b=d;k=r;}});";
 
     /**
      * Video players (Udemy's Shaka among them) cancel the touchend of a tap, so the tap never becomes a click and
@@ -484,14 +489,13 @@ public final class BrowserActivity extends Activity {
      * page instead: a slider (seek, volume) jumps to the pointer, anything else gets a mouse click. The tap still
      * counts as the user's gesture, so a fullscreen button works too.
      */
-    private void clickIfSwallowed(float x, float y) {
-        web.evaluateJavascript("(function(X,Y){X=X*innerWidth/" + web.getWidth() + ";Y=Y*innerHeight/"
-                + web.getHeight() + ";var n=performance.now();"
-                + "var e=n-window.__tvDown<1000&&window.__tvTarget;"
-                + "if(!e||!e.isConnected)e=document.elementFromPoint(X,Y);if(!e)return;"
+    private void clickIfSwallowed(float x, float y, long down) {
+        web.evaluateJavascript("(function(X,Y,A){X=X*innerWidth/" + web.getWidth() + ";Y=Y*innerHeight/"
+                + web.getHeight() + ";" + TAP_OF
+                + "var e=k&&k.e;if(!e||!e.isConnected)e=document.elementFromPoint(X,Y);if(!e)return;"
                 // On the bare video, OK is play/pause: YouTube's player takes a tap's click as "show controls".
-                + "if(e.tagName==='VIDEO'){if(n-window.__tvToggled>1000)e.paused?e.play():e.pause();return;}"
-                + "if(n-window.__tvClick<400||n-window.__tvCancel>1000)return;"
+                + "if(e.tagName==='VIDEO'){if(!(k&&k.toggled))e.paused?e.play():e.pause();return;}"
+                + "if(!k||k.click||!k.cancel)return;"
                 + "e.dispatchEvent(new MouseEvent('mousemove',{bubbles:true,clientX:X,clientY:Y}));"
                 + "var r=e.closest&&e.closest('input[type=range]');if(r){var b=r.getBoundingClientRect(),"
                 + "mn=+r.min||0,mx=r.max===''?100:+r.max;"
@@ -502,7 +506,8 @@ public final class BrowserActivity extends Activity {
                 + "[['pointerdown',1],['mousedown',1],['pointerup',0],['mouseup',0]].forEach(function(t){"
                 + "e.dispatchEvent(new (t[0][0]=='p'?PointerEvent:MouseEvent)(t[0],"
                 + "Object.assign({pointerType:'mouse',buttons:t[1]},o)));});"
-                + "e.dispatchEvent(new MouseEvent('click',o));})(" + x + "," + y + ")", null);
+                + "e.dispatchEvent(new MouseEvent('click',o));})(" + x + "," + y + ","
+                + (SystemClock.uptimeMillis() - down) + ")", null);
     }
 
     /** A synthesised tap focuses a field but does not raise the keyboard on a TV; ask the page and raise it. */
@@ -571,10 +576,15 @@ public final class BrowserActivity extends Activity {
 
         /**
          * A heavy page or protected video can get the page's renderer killed on a 1 GB TV. Unanswered, that takes
-         * the app down with it; instead start over, on the page onPause() kept.
+         * the app down with it; instead start over on Home, not on the page that went down, which could take the
+         * new renderer down again and again.
          */
         @Override
         public boolean onRenderProcessGone(WebView view, android.webkit.RenderProcessGoneDetail detail) {
+            crashed = true;   // onPause() must not keep the page that went down
+            prefs.edit().putString("last", HOME).apply();
+            Toast.makeText(BrowserActivity.this, "That page stopped working, so the browser went back to Home.",
+                    Toast.LENGTH_LONG).show();
             recreate();
             return true;
         }
